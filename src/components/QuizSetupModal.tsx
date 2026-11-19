@@ -96,6 +96,10 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
+// Speaking practice is feature-flagged off until it ships — the engine code
+// remains in place but the mode is never selectable.
+const SPEAKING_PRACTICE_ENABLED = false;
+
 export function QuizSetupModal({
   open,
   languageName,
@@ -130,12 +134,12 @@ export function QuizSetupModal({
     }
   }, [open, mode, voiceSupported]);
 
-  // Speaking practice needs the Web Speech recognition API
+  // Speaking practice is disabled app-wide (coming soon) — never selectable
   useEffect(() => {
-    if (open && mode === 'speaking' && !recognitionSupported) {
+    if (open && mode === 'speaking') {
       setMode('multiple-choice');
     }
-  }, [open, mode, recognitionSupported]);
+  }, [open, mode]);
 
   // Sync defaults whenever the modal opens
   useEffect(() => {
@@ -303,13 +307,16 @@ export function QuizSetupModal({
               const active = mode === opt.id;
               const optionDisabled =
                 (opt.id === 'listening' && !voiceSupported) ||
-                (opt.id === 'speaking' && !recognitionSupported);
+                (opt.id === 'speaking' &&
+                  (!SPEAKING_PRACTICE_ENABLED || !recognitionSupported));
               const disabledHint =
                 opt.id === 'listening' && !voiceSupported
                   ? 'Listening quiz requires a supported browser voice for this language.'
-                  : opt.id === 'speaking' && !recognitionSupported
-                    ? 'Speaking practice requires Chrome or Edge (speech recognition).'
-                    : undefined;
+                  : opt.id === 'speaking' && !SPEAKING_PRACTICE_ENABLED
+                    ? 'Speaking Practice is coming soon.'
+                    : opt.id === 'speaking' && !recognitionSupported
+                      ? 'Speaking practice requires Chrome or Edge (speech recognition).'
+                      : undefined;
               return (
                 <button
                   key={opt.id}
@@ -344,6 +351,11 @@ export function QuizSetupModal({
                         {blankEligibleCards.length} eligible sentences
                       </span>
                     )}
+                    {opt.id === 'speaking' && !SPEAKING_PRACTICE_ENABLED && (
+                      <span className="block mt-1 text-[11px] font-semibold text-[#B45309] dark:text-[#F59E0B]">
+                        Coming soon
+                      </span>
+                    )}
                   </p>
                 </button>
               );
@@ -356,7 +368,7 @@ export function QuizSetupModal({
               language. Speaker buttons are disabled for {languageName}.
             </p>
           )}
-          {!recognitionSupported && (
+          {!recognitionSupported && SPEAKING_PRACTICE_ENABLED && (
             <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               Speaking Practice is unavailable — it needs Chrome or Edge with
