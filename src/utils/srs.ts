@@ -1,0 +1,249 @@
+import { ConfidenceLevel, VocabCard } from '../types';
+
+const BOX_INTERVAL_HOURS: Record<number, number> = {
+  1: 0,        // Immediate re-review
+  2: 12,       // 12 hours
+  3: 48,       // 2 days
+  4: 120,      // 5 days
+  5: 336,      // 14 days
+};
+
+export function inferSrsBox(card: VocabCard): number {
+  if (typeof card.srsBox === 'number' && card.srsBox >= 1 && card.srsBox <= 5) {
+    return card.srsBox;
+  }
+  switch (card.confidence) {
+    case 'easy':
+      return 5;
+    case 'good':
+      return 3;
+    case 'hard':
+      return 1;
+    default:
+      return 1;
+  }
+}
+
+export function isCardDue(card: VocabCard, nowMs = Date.now()): boolean {
+  if (!card.nextReviewAt) return true;
+  const dueMs = Date.parse(card.nextReviewAt);
+  if (Number.isNaN(dueMs)) return true;
+  return dueMs <= nowMs;
+}
+
+export function isWeakCard(card: VocabCard): boolean {
+  if (card.confidence === 'hard') return true;
+  const box = inferSrsBox(card);
+  if ((card.lapses ?? 0) > 0 && box <= 2) return true;
+  if (card.reviewCount > 0 && box <= 2) return true;
+  return false;
+}
+
+/**
+ * Updates a card's Leitner SRS box, nextReviewAt timestamp, streak, lapses,
+ * and derived confidence level after a flashcard rating or quiz answer.
+ */
+export function applySrsOutcome(
+  card: VocabCard,
+  outcome: 'hard' | 'good' | 'easy',
+  now = new Date()
+): VocabCard {
+  const currentBox = inferSrsBox(card);
+  const prevStreak = card.streak ?? 0;
+  const prevLapses = card.lapses ?? 0;
+  const nowIso = now.toISOString();
+
+  let nextBox = currentBox;
+  let nextStreak = prevStreak;
+  let nextLapses = prevLapses;
+  let nextConfidence: ConfidenceLevel = card.confidence;
+
+  if (outcome === 'hard') {
+    nextBox = 1;
+    nextStreak = 0;
+    nextLapses = prevLapses + 1;
+    nextConfidence = 'hard';
+  } else if (outcome === 'good') {
+    nextBox = Math.min(5, Math.max(2, currentBox + 1));
+    nextStreak = prevStreak + 1;
+    nextConfidence = nextBox >= 4 && nextStreak >= 2 ? 'easy' : 'good';
+  } else {
+    // 'easy'
+    nextBox = Math.min(5, Math.max(4, currentBox + 1));
+    nextStreak = prevStreak + 1;
+    nextConfidence = 'easy';
+  }
+
+  const hours = BOX_INTERVAL_HOURS[nextBox] ?? 0;
+  const nextReviewAt = new Date(now.getTime() + hours * 60 * 60 * 1000).toISOString();
+
+  return {
+    ...card,
+    confidence: nextConfidence,
+    reviewCount: card.reviewCount + 1,
+    lastReviewedAt: nowIso,
+    srsBox: nextBox,
+    nextReviewAt,
+    streak: nextStreak,
+    lapses: nextLapses,
+  };
+}
+
+/**
+ * Priority score (lower = higher priority in quiz / smart review queues):
+ * - Box 1 / Hard / Lapsed cards surface first
+ * - Due cards surface before spaced-out future cards
+ * - Easy / Box 5 cards scheduled in the future are pushed to the end
+ */
+export function getCardPriorityScore(card: VocabCard, nowMs = Date.now()): number {
+  const box = inferSrsBox(card);
+  const due = isCardDue(card, nowMs);
+  const lapses = card.lapses ?? 0;
+
+  let score = box * 100;
+  if (card.confidence === 'hard') score -= 90;
+  if (due) score -= 45;
+  else score += 180; // Space out non-due cards
+  if (card.confidence === 'new') score -= 15;
+  score -= Math.min(40, lapses * 10);
+
+  return score;
+}
+
+export function sortCardsBySrsPriority(
+  cards: VocabCard[],
+  nowMs = Date.now()
+): VocabCard[] {
+  // Add small jitter so identical-tier cards rotate naturally across sessions
+  return cards
+    .map((card) => ({
+      card,
+      score: getCardPriorityScore(card, nowMs) + Math.random() * 14,
+    }))
+    .sort((a, b) => a.score - b.score)
+    .map((item) => item.card);
+}
+
+export function getSmartReviewCards(
+  cards: VocabCard[],
+  nowMs = Date.now()
+): { pool: VocabCard[]; mode: 'weak' | 'due' | 'all' } {
+  const weak = sortCardsBySrsPriority(cards.filter(isWeakCard), nowMs);
+  if (weak.length > 0) {
+    return { pool: weak, mode: 'weak' };
+  }
+
+  const due = sortCardsBySrsPriority(
+    cards.filter((c) => isCardDue(c, nowMs)),
+    nowMs
+  );
+  if (due.length > 0) {
+    return { pool: due, mode: 'due' };
+  }
+
+  return { pool: sortCardsBySrsPriority(cards, nowMs), mode: 'all' };
+}
+
+// ---------------------------------------------------------------------------
+// Leech detection & deck mastery
+// ---------------------------------------------------------------------------
+
+export const LEECH_LAPSES_THRESHOLD = 3;
+export const LEECH_WRONG_THRESHOLD = 5;
+
+/**
+ * A "leech" card is one the learner keeps missing: many SRS lapses or a high
+ * cumulative wrong-answer count. These stall momentum and deserve targeted
+ * review or exclusion from casual sessions.
+ */
+export function isLeechCard(card: VocabCard): boolean {
+  return (
+    (card.lapses ?? 0) >= LEECH_LAPSES_THRESHOLD ||
+    (card.wrongCount ?? 0) >= LEECH_WRONG_THRESHOLD
+  );
+}
+
+export interface DeckMastery {
+  total: number;
+  mastered: number;
+  learning: number;
+  fresh: number; // never reviewed
+  masteryPct: number;
+}
+
+/**
+ * Per-deck mastery breakdown:
+ *  - mastered: Leitner box >= 4 or confidence 'easy'
+ *  - fresh:    never reviewed (no reviewCount / nextReviewAt)
+ *  - learning: everything else (reviewed but not yet mastered)
+ */
+export function getDeckMastery(cards: VocabCard[]): DeckMastery {
+  let mastered = 0;
+  let learning = 0;
+  let fresh = 0;
+
+  for (const card of cards) {
+    const box = inferSrsBox(card);
+    const reviewed = (card.reviewCount ?? 0) > 0 || !!card.nextReviewAt;
+    if (box >= 4 || card.confidence === 'easy') {
+      mastered += 1;
+    } else if (!reviewed) {
+      fresh += 1;
+    } else {
+      learning += 1;
+    }
+  }
+
+  const total = cards.length;
+  return {
+    total,
+    mastered,
+    learning,
+    fresh,
+    masteryPct: total === 0 ? 0 : Math.round((mastered / total) * 100),
+  };
+}
+
+export interface ReviewForecast {
+  today: number;
+  tomorrow: number;
+  thisWeek: number;
+}
+
+/**
+ * Bucket cards by when their next review is scheduled. Cards that were never
+ * reviewed (no nextReviewAt) count as due today, matching isCardDue().
+ */
+export function getReviewForecast(
+  cards: VocabCard[],
+  now: Date = new Date()
+): ReviewForecast {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000;
+  const endOfTomorrow = endOfToday + 24 * 60 * 60 * 1000;
+  const endOfWeek = startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000;
+
+  let today = 0;
+  let tomorrow = 0;
+  let thisWeek = 0;
+
+  for (const card of cards) {
+    const dueMs = card.nextReviewAt ? Date.parse(card.nextReviewAt) : NaN;
+    if (Number.isNaN(dueMs)) {
+      // Never scheduled or unparseable -> due immediately
+      today += 1;
+      thisWeek += 1;
+    } else if (dueMs < endOfToday) {
+      today += 1;
+      thisWeek += 1;
+    } else if (dueMs < endOfTomorrow) {
+      tomorrow += 1;
+      thisWeek += 1;
+    } else if (dueMs < endOfWeek) {
+      thisWeek += 1;
+    }
+  }
+
+  return { today, tomorrow, thisWeek };
+}

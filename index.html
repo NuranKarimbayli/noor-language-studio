@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noor Language Studio — Vocabulary &amp; Language Learning</title>
+    <meta
+      name="description"
+      content="Minimalist vocabulary and language learning studio with 3D flashcards, spaced-repetition confidence tracking, and customizable quizzes."
+    />
+    <meta property="og:title" content="Noor Language Studio — Vocabulary &amp; Language Learning" />
+    <meta
+      property="og:description"
+      content="Minimalist vocabulary and language learning studio with 3D flashcards, spaced-repetition confidence tracking, and customizable quizzes."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('kalba_studio_theme');
+          if (saved === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-[#FAF8F5] text-[#1C1917] dark:bg-[#121110] dark:text-[#F5F2EC] antialiased selection:bg-[#B45309]/20 selection:text-[#92400E] dark:selection:bg-[#D97706]/30 dark:selection:text-[#FDE68A]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

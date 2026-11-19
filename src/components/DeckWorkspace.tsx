@@ -1,0 +1,1643 @@
+import { ChangeEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  AlertCircle,
+  BookOpen,
+  FileUp,
+  ListPlus,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { ConfidenceLevel, Deck, DifficultyLevel, VocabCard } from '../types';
+import { exportDeckAsJson, findDuplicateCard, getCardDifficulty, parseImportedDeckJson } from '../utils/storage';
+import { getDeckMastery, isCardDue, isLeechCard } from '../utils/srs';
+import { parseBulkLines } from '../utils/textUtils';
+import { DiacriticBar } from './DiacriticBar';
+import { Modal } from './Modal';
+import { SpeakButton } from './SpeakButton';
+import { VoiceSelection } from '../utils/speechUtils';
+
+interface DeckWorkspaceProps {
+  languageName: string;
+  languageCode: string;
+  decks: Deck[];
+  cards: VocabCard[];
+  selectedDeckId: string;
+  addWordsTrigger: number;
+  onConsumeAddWords: () => void;
+  onSelectDeck: (deckId: string) => void;
+  onCreateDeck: (data: { name: string; description: string }) => Promise<Deck>;
+  onUpdateDeck: (
+    deckId: string,
+    updates: { name?: string; description?: string }
+  ) => Promise<void>;
+  onDeleteDeck: (deckId: string) => Promise<void>;
+  onAddCard: (
+    deckId: string,
+    data: {
+      word: string;
+      translation: string;
+      exampleSentence?: string;
+      difficulty?: DifficultyLevel;
+      mnemonic?: string;
+    }
+  ) => Promise<void>;
+  onBulkAddCards: (
+    deckId: string,
+    items: Array<{ word: string; translation: string; exampleSentence?: string }>,
+    difficulty?: DifficultyLevel
+  ) => Promise<void>;
+  onUpdateCard: (
+    cardId: string,
+    updates: {
+      word: string;
+      translation: string;
+      exampleSentence?: string;
+      difficulty?: DifficultyLevel;
+      mnemonic?: string;
+    }
+  ) => Promise<void>;
+  onDeleteCard: (cardId: string) => Promise<void>;
+  onImportDeckJson: (payload: {
+    deckName: string;
+    description: string;
+    cards: Array<{
+      word: string;
+      translation: string;
+      exampleSentence?: string;
+      confidence: ConfidenceLevel;
+      difficulty?: DifficultyLevel;
+    }>;
+  }) => Promise<void>;
+  onPracticeDeck: (deckId: string) => void;
+  onNotify: (text: string, variant?: 'success' | 'info' | 'error') => void;
+  ttsMuted?: boolean;
+  voice?: VoiceSelection | null;
+}
+
+type ModalState =
+  | { type: 'none' }
+  | { type: 'create-deck' }
+  | { type: 'edit-deck'; deck: Deck }
+  | { type: 'delete-deck'; deck: Deck }
+  | { type: 'add-words'; tab: 'single' | 'bulk' }
+  | { type: 'edit-card'; card: VocabCard }
+  | { type: 'json-import' };
+
+const CONFIDENCE_FILTERS: Array<{ value: 'all' | ConfidenceLevel; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'new', label: 'New' },
+  { value: 'hard', label: 'Hard' },
+  { value: 'good', label: 'Good' },
+  { value: 'easy', label: 'Easy' },
+];
+
+const DIFFICULTY_OPTIONS: Array<{ value: DifficultyLevel; label: string }> = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+];
+
+export function DeckWorkspace({
+  languageName,
+  languageCode,
+  decks,
+  cards,
+  selectedDeckId,
+  addWordsTrigger,
+  onConsumeAddWords,
+  onSelectDeck,
+  onCreateDeck,
+  onUpdateDeck,
+  onDeleteDeck,
+  onAddCard,
+  onBulkAddCards,
+  onUpdateCard,
+  onDeleteCard,
+  onImportDeckJson,
+  onPracticeDeck,
+  onNotify,
+  ttsMuted = false,
+  voice,
+}: DeckWorkspaceProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | ConfidenceLevel>('all');
+  const [modalState, setModal] = useState<ModalState>({ type: 'none' });
+  // Keep the last open modal payload so the exit animation retains content
+  const lastModalRef = useRef<ModalState>({ type: 'none' });
+  if (modalState.type !== 'none') lastModalRef.current = modalState;
+  const modal = modalState.type !== 'none' ? modalState : lastModalRef.current;
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
+  // Dropdown menus
+  const [openDeckMenuId, setOpenDeckMenuId] = useState<string | null>(null);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+
+  // Deck form state
+  const [deckName, setDeckName] = useState('');
+  const [deckDescription, setDeckDescription] = useState('');
+
+  // Card form state
+  const [cardWord, setCardWord] = useState('');
+  const [cardTranslation, setCardTranslation] = useState('');
+  const [cardExample, setCardExample] = useState('');
+  const [cardMnemonic, setCardMnemonic] = useState('');
+  const [targetDeckNameForNew, setTargetDeckNameForNew] = useState('');
+  const wordInputRef = useRef<HTMLInputElement>(null);
+  const bulkTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // Bulk import state
+  const [bulkText, setBulkText] = useState('');
+  const [cardDifficulty, setCardDifficulty] = useState<DifficultyLevel>('medium');
+  const [bulkDifficulty, setBulkDifficulty] = useState<DifficultyLevel>('medium');
+
+  // JSON import state
+  const [jsonText, setJsonText] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search query
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 200);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const selectedDeck = useMemo(
+    () => decks.find((d) => d.id === selectedDeckId) ?? decks[0] ?? null,
+    [decks, selectedDeckId]
+  );
+
+  // Auto-select first deck if selected deck no longer exists
+  useEffect(() => {
+    if (selectedDeckId && !decks.find((d) => d.id === selectedDeckId) && decks.length > 0) {
+      onSelectDeck(decks[0].id);
+    }
+  }, [selectedDeckId, decks, onSelectDeck]);
+
+  const deckCards = useMemo(() => {
+    if (!selectedDeck) return [];
+    return cards.filter((c) => c.deckId === selectedDeck.id);
+  }, [cards, selectedDeck]);
+
+  // Single pass over cards to avoid O(decks × cards) filtering on every render
+  const cardCountsByDeck = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of cards) {
+      counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
+    }
+    return counts;
+  }, [cards]);
+
+  // Per-deck count of cards currently due for SRS review
+  const dueCountByDeck = useMemo(() => {
+    const counts = new Map<string, number>();
+    const nowMs = Date.now();
+    for (const card of cards) {
+      if (isCardDue(card, nowMs)) {
+        counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [cards]);
+
+  // Per-deck mastery breakdown (mastered / learning / fresh + percentage)
+  const masteryByDeck = useMemo(() => {
+    const byDeck = new Map<string, VocabCard[]>();
+    for (const card of cards) {
+      const list = byDeck.get(card.deckId);
+      if (list) list.push(card);
+      else byDeck.set(card.deckId, [card]);
+    }
+    const result = new Map<string, ReturnType<typeof getDeckMastery>>();
+    for (const [deckId, deckCards] of byDeck) {
+      result.set(deckId, getDeckMastery(deckCards));
+    }
+    return result;
+  }, [cards]);
+
+  const selectedDeckMastery = selectedDeck
+    ? masteryByDeck.get(selectedDeck.id)
+    : undefined;
+
+  const stats = useMemo(() => {
+    const counts = { total: deckCards.length, new: 0, hard: 0, good: 0, easy: 0 };
+    for (const c of deckCards) {
+      counts[c.confidence] += 1;
+    }
+    return counts;
+  }, [deckCards]);
+
+  // Deferred value keeps the list responsive while a large filter recomputes
+  const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
+
+  const filteredCards = useMemo(() => {
+    const q = deferredSearchQuery.trim().toLowerCase();
+    return deckCards.filter((card) => {
+      if (confidenceFilter !== 'all' && card.confidence !== confidenceFilter) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        card.word.toLowerCase().includes(q) ||
+        card.translation.toLowerCase().includes(q) ||
+        (card.exampleSentence && card.exampleSentence.toLowerCase().includes(q))
+      );
+    });
+  }, [deckCards, deferredSearchQuery, confidenceFilter]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCards.length / ITEMS_PER_PAGE) || 1;
+
+  // Clamp the page if deletions shrink the result set below the current page
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(p, totalPages));
+  }, [totalPages]);
+  const paginatedCards = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredCards.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredCards, currentPage]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [confidenceFilter]);
+
+  const bulkParsed = useMemo(() => parseBulkLines(bulkText), [bulkText]);
+
+  // Non-blocking duplicate warning: same word (case/diacritic-insensitive)
+  // already present in the target deck
+  const duplicateMatch = useMemo(() => {
+    const word = cardWord.trim();
+    if (!word) return undefined;
+    if (modal.type !== 'add-words' && modal.type !== 'edit-card') return undefined;
+    const pool =
+      modal.type === 'edit-card'
+        ? cards.filter((c) => c.deckId === modal.card.deckId)
+        : selectedDeck
+          ? deckCards
+          : [];
+    return findDuplicateCard(
+      pool,
+      word,
+      modal.type === 'edit-card' ? modal.card.id : undefined
+    );
+  }, [cardWord, modal, cards, deckCards, selectedDeck]);
+
+  // Close open dropdown menus when clicking anywhere outside
+  useEffect(() => {
+    if (!openDeckMenuId && !headerMenuOpen && !openCardMenuId) return;
+    const handleDocClick = () => {
+      setOpenDeckMenuId(null);
+      setHeaderMenuOpen(false);
+      setOpenCardMenuId(null);
+    };
+    window.addEventListener('click', handleDocClick);
+    return () => window.removeEventListener('click', handleDocClick);
+  }, [openDeckMenuId, headerMenuOpen, openCardMenuId]);
+
+  // Close all dropdowns on unmount
+  useEffect(() => {
+    return () => {
+      setOpenDeckMenuId(null);
+      setHeaderMenuOpen(false);
+      setOpenCardMenuId(null);
+    };
+  }, []);
+
+  // Trigger "+ Add Words" modal from top navigation CTA
+  useEffect(() => {
+    if (addWordsTrigger > 0) {
+      setCardWord('');
+      setCardTranslation('');
+      setCardExample('');
+      setCardMnemonic('');
+      setBulkText('');
+      setCardDifficulty('medium');
+      setBulkDifficulty('medium');
+      setTargetDeckNameForNew(`${languageName} Basics`);
+      setModal({ type: 'add-words', tab: 'single' });
+      onConsumeAddWords();
+    }
+  }, [addWordsTrigger, languageName, onConsumeAddWords]);
+
+  const openCreateDeck = () => {
+    setDeckName('');
+    setDeckDescription('');
+    setModal({ type: 'create-deck' });
+  };
+
+  const openEditDeck = (deck: Deck) => {
+    setDeckName(deck.name);
+    setDeckDescription(deck.description);
+    setModal({ type: 'edit-deck', deck });
+  };
+
+  const openAddWords = (tab: 'single' | 'bulk' = 'single') => {
+    setCardWord('');
+    setCardTranslation('');
+    setCardExample('');
+    setCardMnemonic('');
+    setBulkText('');
+    setCardDifficulty('medium');
+    setBulkDifficulty('medium');
+    setTargetDeckNameForNew(`${languageName} Basics`);
+    setModal({ type: 'add-words', tab });
+  };
+
+  const openEditCard = (card: VocabCard) => {
+    setCardWord(card.word);
+    setCardTranslation(card.translation);
+    setCardExample(card.exampleSentence ?? '');
+    setCardMnemonic(card.mnemonic ?? '');
+    setCardDifficulty(getCardDifficulty(card));
+    setModal({ type: 'edit-card', card });
+  };
+
+  const openJsonImport = () => {
+    setJsonText('');
+    setJsonError(null);
+    setModal({ type: 'json-import' });
+  };
+
+  const handleDeckSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmedName = deckName.trim();
+    if (!trimmedName) return;
+
+    try {
+      if (modal.type === 'create-deck') {
+        const created = await onCreateDeck({
+          name: trimmedName,
+          description: deckDescription.trim(),
+        });
+        onSelectDeck(created.id);
+        onNotify(`Created deck "${created.name}"`, 'success');
+      } else if (modal.type === 'edit-deck') {
+        await onUpdateDeck(modal.deck.id, {
+          name: trimmedName,
+          description: deckDescription.trim(),
+        });
+        onNotify(`Updated deck "${trimmedName}"`, 'success');
+      }
+      setModal({ type: 'none' });
+    } catch {
+      onNotify('Could not save the deck. Please try again.', 'error');
+    }
+  };
+
+  const ensureTargetDeck = async (): Promise<Deck> => {
+    if (selectedDeck) return selectedDeck;
+    const created = await onCreateDeck({
+      name: targetDeckNameForNew.trim() || `${languageName} Vocabulary`,
+      description: `Custom ${languageName} vocabulary list`,
+    });
+    onSelectDeck(created.id);
+    return created;
+  };
+
+  const handleSingleCardSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const word = cardWord.trim();
+    const translation = cardTranslation.trim();
+    const exampleSentence = cardExample.trim() || undefined;
+    const mnemonic = cardMnemonic.trim() || undefined;
+    if (!word || !translation) return;
+
+    try {
+      if (modal.type === 'edit-card') {
+        await onUpdateCard(modal.card.id, {
+          word,
+          translation,
+          exampleSentence,
+          difficulty: cardDifficulty,
+          mnemonic,
+        });
+        onNotify(`Updated "${word}"`, 'success');
+      } else {
+        const target = await ensureTargetDeck();
+        await onAddCard(target.id, {
+          word,
+          translation,
+          exampleSentence,
+          difficulty: cardDifficulty,
+          mnemonic,
+        });
+        onNotify(`Added "${word}"`, 'success');
+      }
+      setModal({ type: 'none' });
+    } catch {
+      onNotify('Could not save the word. Please try again.', 'error');
+    }
+  };
+
+  const handleBulkSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (bulkParsed.items.length === 0) return;
+    try {
+      const target = await ensureTargetDeck();
+      await onBulkAddCards(target.id, bulkParsed.items, bulkDifficulty);
+      onNotify(
+        `Imported ${bulkParsed.items.length} ${bulkParsed.items.length === 1 ? 'word' : 'words'} into "${target.name}"`,
+        'success'
+      );
+      setModal({ type: 'none' });
+    } catch {
+      onNotify('Could not import the words. Please try again.', 'error');
+    }
+  };
+
+  const insertCharAtCursor = (
+    input: HTMLInputElement | HTMLTextAreaElement | null,
+    current: string,
+    apply: (next: string) => void,
+    char: string
+  ) => {
+    if (!input) {
+      apply(current + char);
+      return;
+    }
+    const start = input.selectionStart ?? current.length;
+    const end = input.selectionEnd ?? current.length;
+    apply(current.slice(0, start) + char + current.slice(end));
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(start + char.length, start + char.length);
+    });
+  };
+
+  const handleInsertDiacritic = (char: string) => {
+    insertCharAtCursor(wordInputRef.current, cardWord, setCardWord, char);
+  };
+
+  const handleInsertBulkDiacritic = (char: string) => {
+    insertCharAtCursor(bulkTextRef.current, bulkText, setBulkText, char);
+  };
+
+  const handleJsonFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setJsonText(reader.result);
+        setJsonError(null);
+      }
+      // Allow re-selecting the same file on consecutive imports
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  const handleJsonSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      const parsed = parseImportedDeckJson(jsonText);
+      await onImportDeckJson(parsed);
+      onNotify(
+        `Imported "${parsed.deckName}" (${parsed.cards.length} words)`,
+        'success'
+      );
+      setModal({ type: 'none' });
+    } catch (err) {
+      setJsonError(
+        err instanceof Error ? err.message : 'Could not import the deck. Please try again.'
+      );
+    }
+  };
+
+  const renderDifficultyPicker = (
+    value: DifficultyLevel,
+    onChange: (next: DifficultyLevel) => void
+  ) => (
+    <div>
+      <span className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+        Difficulty
+      </span>
+      <div className="flex items-center gap-1.5">
+        {DIFFICULTY_OPTIONS.map((opt) => {
+          const active = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors capitalize ${
+                active
+                  ? opt.value === 'easy'
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200'
+                    : opt.value === 'medium'
+                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200'
+                      : 'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200'
+                  : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const confidenceStyle = (confidence: ConfidenceLevel) => {
+    switch (confidence) {
+      case 'easy':
+        return 'text-emerald-700 dark:text-emerald-400';
+      case 'good':
+        return 'text-[#B45309] dark:text-[#F59E0B]';
+      case 'hard':
+        return 'text-red-700 dark:text-red-400';
+      default:
+        return 'text-[#78716C] dark:text-[#A8A29E]';
+    }
+  };
+
+  return (
+    <div className="space-y-12">
+      {/* Section 1: Airy Deck Selector Cards */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium text-[#57534E] dark:text-[#A8A29E]">
+            {languageName} Decks ({decks.length})
+          </h2>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openJsonImport}
+              className="text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
+            >
+              Import JSON
+            </button>
+            <button
+              type="button"
+              onClick={openCreateDeck}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New Deck
+            </button>
+          </div>
+        </div>
+
+        {decks.length === 0 ? (
+          <div className="py-16 px-6 text-center bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl">
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] mb-2">
+              No {languageName} decks yet
+            </h1>
+            <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mb-6 max-w-md mx-auto">
+              Create your first {languageName} deck or import an existing JSON deck to begin.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={openCreateDeck}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create First Deck
+              </button>
+              <button
+                type="button"
+                onClick={openJsonImport}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
+              >
+                <FileUp className="w-4 h-4" />
+                Import JSON
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {decks.map((deck) => {
+              const count = cardCountsByDeck.get(deck.id) ?? 0;
+              const dueCount = dueCountByDeck.get(deck.id) ?? 0;
+              const mastery = masteryByDeck.get(deck.id);
+              const active = selectedDeck?.id === deck.id;
+              const menuOpen = openDeckMenuId === deck.id;
+
+              return (
+                <div
+                  key={deck.id}
+                  onClick={() => onSelectDeck(deck.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectDeck(deck.id);
+                    }
+                  }}
+                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all ${
+                    active
+                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-xs'
+                      : 'bg-white/70 dark:bg-[#171513] border-slate-200 dark:border-[#2E2A25] hover:border-slate-300 dark:hover:border-[#443E37]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-medium text-sm sm:text-base text-[#1C1917] dark:text-[#F5F2EC] leading-snug pr-2">
+                      {deck.name}
+                    </h3>
+
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        aria-label={`More actions for ${deck.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setHeaderMenuOpen(false);
+                          setOpenCardMenuId(null);
+                          setOpenDeckMenuId(menuOpen ? null : deck.id);
+                        }}
+                        className="p-1.5 -mr-1.5 -mt-1 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+
+                      <AnimatePresence>
+                      {menuOpen && (
+                        <motion.div
+                          key="deck-menu"
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 mt-1 w-40 z-20 bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-xl shadow-lg py-1 text-xs"
+                          initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          style={{ transformOrigin: 'top right' }}
+                        >
+                          {count > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenDeckMenuId(null);
+                                onPracticeDeck(deck.id);
+                              }}
+                              className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#B45309] dark:text-[#F59E0B] font-medium hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                            >
+                              <BookOpen className="w-3.5 h-3.5" />
+                              Practice Deck
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDeckMenuId(null);
+                              openEditDeck(deck);
+                            }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
+                            Edit Deck
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDeckMenuId(null);
+                              const dCards = cards.filter((c) => c.deckId === deck.id);
+                              exportDeckAsJson(deck, dCards);
+                              onNotify(`Exported "${deck.name}" as JSON`, 'success');
+                            }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                          >
+                            <FileUp className="w-3.5 h-3.5 text-[#78716C]" />
+                            Export JSON
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDeckMenuId(null);
+                              setModal({ type: 'delete-deck', deck });
+                            }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete Deck
+                          </button>
+                        </motion.div>
+                      )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                    <span>
+                      {count} {count === 1 ? 'word' : 'words'}
+                    </span>
+                    {dueCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] font-medium">
+                        {dueCount} due
+                      </span>
+                    )}
+                    {mastery && count > 0 && (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-medium"
+                        title={`${mastery.mastered} mastered · ${mastery.learning} learning · ${mastery.fresh} new`}
+                      >
+                        {mastery.masteryPct}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Section 2: Active Deck Word List */}
+      {selectedDeck && (
+        <section className="space-y-5">
+          {/* Calm Deck Title & Overflow Menu */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#2E2A25]">
+            <div className="space-y-1.5">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC]">
+                {selectedDeck.name}
+              </h1>
+              {selectedDeck.description && (
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-xl">
+                  {selectedDeck.description}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums pt-0.5">
+                <span>{stats.total} {stats.total === 1 ? 'word' : 'words'}</span>
+                <span aria-hidden="true">·</span>
+                <span>{stats.easy} easy</span>
+                <span aria-hidden="true">·</span>
+                <span>{stats.good} good</span>
+                <span aria-hidden="true">·</span>
+                <span>{stats.hard} hard</span>
+                <span aria-hidden="true">·</span>
+                <span>{stats.new} new</span>
+                {selectedDeckMastery && selectedDeckMastery.total > 0 && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span
+                      className="text-emerald-700 dark:text-emerald-300 font-medium"
+                      title={`${selectedDeckMastery.mastered} mastered · ${selectedDeckMastery.learning} learning · ${selectedDeckMastery.fresh} new`}
+                    >
+                      {selectedDeckMastery.masteryPct}% mastery
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {selectedDeckMastery.mastered} mastered ·{' '}
+                      {selectedDeckMastery.learning} learning ·{' '}
+                      {selectedDeckMastery.fresh} new
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Deck actions"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDeckMenuId(null);
+                    setOpenCardMenuId(null);
+                    setHeaderMenuOpen((prev) => !prev);
+                  }}
+                  className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+
+                <AnimatePresence>
+                {headerMenuOpen && (
+                  <motion.div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-0 mt-1.5 w-48 z-20 bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-xl shadow-lg py-1.5 text-xs"
+                    initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    style={{ transformOrigin: 'top right' }}
+                  >
+                    {deckCards.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          onPracticeDeck(selectedDeck.id);
+                        }}
+                        className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#B45309] dark:text-[#F59E0B] font-medium hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Practice This Deck
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        openAddWords('bulk');
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                    >
+                      <ListPlus className="w-3.5 h-3.5 text-[#78716C]" />
+                      Bulk Import Words
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        openEditDeck(selectedDeck);
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
+                      Edit Deck
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        exportDeckAsJson(selectedDeck, deckCards);
+                        onNotify(`Exported "${selectedDeck.name}" as JSON`, 'success');
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                    >
+                      <FileUp className="w-3.5 h-3.5 text-[#78716C]" />
+                      Export JSON
+                    </button>
+                    <div className="my-1 border-t border-slate-200 dark:border-[#2E2A25]" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        setModal({ type: 'delete-deck', deck: selectedDeck });
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete Deck
+                    </button>
+                  </motion.div>
+                )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Minimal Filter Strip */}
+          {deckCards.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#A8A29E] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search words..."
+                    className="w-full pl-10 pr-9 py-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#78716C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openAddWords('single')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>New Word</span>
+                </button>
+              </div>
+
+              <div
+                role="group"
+                aria-label="Filter words by confidence"
+                className="flex items-center gap-1 text-xs"
+              >
+                {CONFIDENCE_FILTERS.map((f) => {
+                  const active = confidenceFilter === f.value;
+                  return (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setConfidenceFilter(f.value)}
+                      className={`px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap shrink-0 ${
+                        active
+                          ? 'bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC]'
+                          : 'text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Uncluttered Word Pair List */}
+          <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl">
+            {deckCards.length === 0 ? (
+              <div className="py-14 px-6 text-center space-y-4">
+                <p className="font-display text-xl font-medium text-[#1C1917] dark:text-[#F5F2EC]">
+                  This deck has no words yet
+                </p>
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
+                  Add words individually or paste a list in <code className="font-mono">word - translation</code> format.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => openAddWords('single')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Words
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openAddWords('bulk')}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
+                  >
+                    <ListPlus className="w-4 h-4" />
+                    Bulk Import
+                  </button>
+                </div>
+              </div>
+            ) : filteredCards.length === 0 ? (
+              <div className="py-12 px-6 text-center">
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mb-3">
+                  No words match your current search or filter.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setConfidenceFilter('all');
+                  }}
+                  className="text-sm font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
+                >
+                  Reset filters
+                </button>
+              </div>
+            ) : (
+              <>
+                <ul className="divide-y divide-slate-200 dark:divide-[#2E2A25]">
+                  {paginatedCards.map((card) => {
+                  const cardMenuOpen = openCardMenuId === card.id;
+                  return (
+                    <li
+                      key={card.id}
+                      className="group px-5 py-4 flex items-start justify-between gap-4 hover:bg-[#FAF8F5]/60 dark:hover:bg-[#221E1A]/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="font-display text-lg font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
+                            {card.word}
+                          </span>
+                          <SpeakButton
+                            text={card.word}
+                            langCode={languageCode}
+                            muted={ttsMuted}
+                            voice={voice}
+                            className="-my-1"
+                          />
+                          <span className="text-[#A8A29E]" aria-hidden="true">
+                            —
+                          </span>
+                          <span className="text-sm sm:text-base text-[#57534E] dark:text-[#C4BEB4] select-text">
+                            {card.translation}
+                          </span>
+                        </div>
+                        {card.exampleSentence && (
+                          <p className="text-xs sm:text-sm italic text-[#78716C] dark:text-[#A8A29E]">
+                            {card.exampleSentence}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                        {isLeechCard(card) && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-semibold"
+                            title="Leech card — repeatedly missed. Prioritize or exclude it in quiz setup."
+                          >
+                            <AlertCircle className="w-3 h-3" />
+                            Leech
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs font-medium capitalize ${confidenceStyle(card.confidence)}`}
+                        >
+                          {card.confidence}
+                        </span>
+
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-label={`Actions for ${card.word}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDeckMenuId(null);
+                              setHeaderMenuOpen(false);
+                              setOpenCardMenuId(cardMenuOpen ? null : card.id);
+                            }}
+                            className="p-1.5 rounded-lg text-[#A8A29E] opacity-70 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-all"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+
+                          <AnimatePresence>
+                          {cardMenuOpen && (
+                            <motion.div
+                              key="card-menu"
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 mt-1 w-32 z-20 bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-xl shadow-lg py-1 text-xs"
+                              initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                              transition={{ duration: 0.15, ease: 'easeOut' }}
+                              style={{ transformOrigin: 'top right' }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenCardMenuId(null);
+                                  openEditCard(card);
+                                }}
+                                className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setOpenCardMenuId(null);
+                                  try {
+                                    await onDeleteCard(card.id);
+                                  } catch {
+                                    onNotify('Could not delete the word. Please try again.', 'error');
+                                  }
+                                }}
+                                className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                              </button>
+                            </motion.div>
+                          )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 dark:border-[#2E2A25]">
+                  <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredCards.length)} of {filteredCards.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Modals */}
+      <Modal
+        open={modalState.type !== 'none'}
+        onClose={() => setModal({ type: 'none' })}
+        panelClassName="max-w-lg p-6 max-h-[90vh] overflow-y-auto"
+      >
+            {(modal.type === 'create-deck' || modal.type === 'edit-deck') && (
+              <form onSubmit={handleDeckSubmit} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    {modal.type === 'create-deck' ? `New ${languageName} Deck` : 'Edit Deck'}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Deck Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={deckName}
+                    onChange={(e) => setDeckName(e.target.value)}
+                    placeholder={`e.g., ${languageName} Travel Essentials`}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Description (optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={deckDescription}
+                    onChange={(e) => setDeckDescription(e.target.value)}
+                    placeholder="Short note on what this vocabulary deck covers"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
+                  >
+                    {modal.type === 'create-deck' ? 'Create Deck' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modal.type === 'delete-deck' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    Delete Deck
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
+                  Are you sure you want to delete{' '}
+                  <strong className="text-[#1C1917] dark:text-[#F5F2EC]">
+                    {modal.deck.name}
+                  </strong>
+                  ? This removes all {cards.filter((c) => c.deckId === modal.deck.id).length} words
+                  in this deck from your browser storage.
+                </p>
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await onDeleteDeck(modal.deck.id);
+                        setModal({ type: 'none' });
+                      } catch {
+                        onNotify('Could not delete the deck. Please try again.', 'error');
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
+                  >
+                    Delete Deck
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modal.type === 'add-words' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    Add Words
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Single vs Bulk Tab Switch */}
+                <div className="flex items-center gap-1 p-1 bg-[#F3EFE8] dark:bg-[#121110] rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'add-words', tab: 'single' })}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      modal.tab === 'single'
+                        ? 'bg-white dark:bg-[#2A2621] text-[#1C1917] dark:text-[#F5F2EC] shadow-xs'
+                        : 'text-[#57534E] dark:text-[#A8A29E]'
+                    }`}
+                  >
+                    Single Word
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'add-words', tab: 'bulk' })}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      modal.tab === 'bulk'
+                        ? 'bg-white dark:bg-[#2A2621] text-[#1C1917] dark:text-[#F5F2EC] shadow-xs'
+                        : 'text-[#57534E] dark:text-[#A8A29E]'
+                    }`}
+                  >
+                    Bulk Import
+                  </button>
+                </div>
+
+                {!selectedDeck && (
+                  <div>
+                    <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                      New Deck Name
+                    </label>
+                    <input
+                      type="text"
+                      value={targetDeckNameForNew}
+                      onChange={(e) => setTargetDeckNameForNew(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                    />
+                  </div>
+                )}
+
+                {modal.tab === 'single' ? (
+                  <form onSubmit={handleSingleCardSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                        {languageName} (Target)
+                      </label>
+                      <input
+                        ref={wordInputRef}
+                        type="text"
+                        required
+                        autoFocus
+                        value={cardWord}
+                        onChange={(e) => setCardWord(e.target.value)}
+                        placeholder={`e.g., a ${languageName} word`}
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                      />
+                      <DiacriticBar
+                        langCode={languageCode}
+                        onInsert={handleInsertDiacritic}
+                      />
+                      {duplicateMatch && (
+                        <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            &ldquo;{duplicateMatch.word}&rdquo; already exists in this
+                            deck — you can still add it if the meaning differs.
+                          </span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                        Translation (Meaning)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={cardTranslation}
+                        onChange={(e) => setCardTranslation(e.target.value)}
+                        placeholder="e.g., its meaning in your language"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                        Example Sentence (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={cardExample}
+                        onChange={(e) => setCardExample(e.target.value)}
+                        placeholder="e.g., Labas rytas!"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                        Memory Tip (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={cardMnemonic}
+                        onChange={(e) => setCardMnemonic(e.target.value)}
+                        placeholder="e.g., Sounds like 'labas' — imagine a lab assistant"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                      />
+                    </div>
+
+                    {renderDifficultyPicker(cardDifficulty, setCardDifficulty)}
+
+                    <div className="flex items-center justify-end gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setModal({ type: 'none' })}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
+                      >
+                        Add Word
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleBulkSubmit} className="space-y-4">
+                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
+                      Paste one entry per line as{' '}
+                      <code className="font-mono">{languageName} word - meaning</code>.
+                      Optionally add an example sentence after <code className="font-mono">|</code>.
+                    </p>
+
+                    <textarea
+                      ref={bulkTextRef}
+                      rows={7}
+                      autoFocus
+                      value={bulkText}
+                      onChange={(e) => setBulkText(e.target.value)}
+                      placeholder={`labas - salam | Labas rytas!\načiū - təşəkkür edirəm | Labai ačiū!\nvanduo - su`}
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm font-mono text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                    />
+
+                    <DiacriticBar
+                      langCode={languageCode}
+                      onInsert={handleInsertBulkDiacritic}
+                    />
+
+                    {renderDifficultyPicker(bulkDifficulty, setBulkDifficulty)}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                        {bulkParsed.items.length} valid {bulkParsed.items.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                      {bulkParsed.skippedLines.length > 0 && (
+                        <span className="text-amber-700 dark:text-amber-400">
+                          Skipped lines: {bulkParsed.skippedLines.join(', ')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setModal({ type: 'none' })}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={bulkParsed.items.length === 0}
+                        className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                      >
+                        Import {bulkParsed.items.length} Words
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {modal.type === 'edit-card' && (
+              <form onSubmit={handleSingleCardSubmit} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    Edit Vocabulary Word
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    {languageName} (Target)
+                  </label>
+                  <input
+                    ref={wordInputRef}
+                    type="text"
+                    required
+                    autoFocus
+                    value={cardWord}
+                    onChange={(e) => setCardWord(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                  <DiacriticBar
+                    langCode={languageCode}
+                    onInsert={handleInsertDiacritic}
+                  />
+                  {duplicateMatch && (
+                    <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        &ldquo;{duplicateMatch.word}&rdquo; already exists in this
+                        deck — you can still save if the meaning differs.
+                      </span>
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Translation (Meaning)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={cardTranslation}
+                    onChange={(e) => setCardTranslation(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Example Sentence (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={cardExample}
+                    onChange={(e) => setCardExample(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Memory Tip (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={cardMnemonic}
+                    onChange={(e) => setCardMnemonic(e.target.value)}
+                    placeholder="e.g., Sounds like 'labas' — imagine a lab assistant"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                {renderDifficultyPicker(cardDifficulty, setCardDifficulty)}
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
+                  >
+                    Save Word
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modal.type === 'json-import' && (
+              <form onSubmit={handleJsonSubmit} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    Import Deck from JSON
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                    Choose a <code className="font-mono">.json</code> file or paste exported JSON below.
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleJsonFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] shrink-0"
+                  >
+                    Choose File
+                  </button>
+                </div>
+
+                <textarea
+                  rows={8}
+                  value={jsonText}
+                  onChange={(e) => {
+                    setJsonText(e.target.value);
+                    setJsonError(null);
+                  }}
+                  placeholder={`{\n  "name": "Lithuanian Food",\n  "cards": [\n    { "word": "obuolys", "translation": "alma", "exampleSentence": "Raudonas obuolys." }\n  ]\n}`}
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-xs font-mono text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                />
+
+                {jsonError && (
+                  <p className="text-xs text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {jsonError}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!jsonText.trim()}
+                    className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    Import Deck
+                  </button>
+                </div>
+              </form>
+            )}
+      </Modal>
+    </div>
+  );
+}

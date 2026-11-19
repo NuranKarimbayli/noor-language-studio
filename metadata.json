@@ -1,0 +1,8 @@
+{
+  "name": "Kalba Studio",
+  "description": "Interactive vocabulary and language learning studio with 3D flashcards, spaced-repetition confidence tracking, speech pronunciation, and customizable quizzes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
