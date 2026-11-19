@@ -193,12 +193,15 @@ export function ActivitySection({
         card,
         misses: Math.max(card.wrongCount ?? 0, card.lapses ?? 0),
       }))
-      .filter((entry) => entry.misses > 0)
+      .filter((entry) => entry.misses > 0 && !entry.card.suspended)
       .sort((a, b) => b.misses - a.misses || a.card.word.localeCompare(b.card.word))
       .slice(0, MISTAKE_BANK_SIZE);
   }, [cards]);
 
-  const leechCount = useMemo(() => cards.filter(isLeechCard).length, [cards]);
+  const leechCount = useMemo(
+    () => cards.filter((c) => !c.suspended && isLeechCard(c)).length,
+    [cards]
+  );
 
   const recentSessions = sessions.slice(0, 6);
 

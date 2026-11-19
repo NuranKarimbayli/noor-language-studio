@@ -355,7 +355,9 @@ export function QuizCenter({
 
   // Initialize quiz whenever sessionConfig changes
   useEffect(() => {
-    let selectedPool = cards.filter((c) => sessionConfig.deckIds.includes(c.deckId));
+    let selectedPool = cards.filter(
+      (c) => sessionConfig.deckIds.includes(c.deckId) && !c.suspended
+    );
     if (sessionConfig.smartReviewOnly && sessionConfig.smartCardIds?.length) {
       const targetSet = new Set(sessionConfig.smartCardIds);
       const focused = selectedPool.filter((c) => targetSet.has(c.id));

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, AudioLines, CalendarClock, Keyboard, MicOff, Moon, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, AudioLines, CalendarClock, Keyboard, MicOff, Monitor, Moon, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { CategoryScreen } from './components/CategoryScreen';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -232,15 +232,18 @@ export default function App() {
     saveAppPrefs(appPrefs).catch(console.error);
   }, [appPrefs, isLoading]);
 
-  // Apply theme to document
+  // Apply theme to document — 'system' follows prefers-color-scheme live
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const apply = () => root.classList.toggle('dark', mq.matches);
+      apply();
+      mq.addEventListener('change', apply);
+      return () => mq.removeEventListener('change', apply);
     }
+    root.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   // Cleanup audio context and speech on unmount
@@ -363,7 +366,8 @@ export default function App() {
   }, []);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+    // Header quick-toggle cycles light -> dark -> system -> light
+    setTheme((prev) => (prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light'));
   };
 
   const toggleSfxMute = () => {
@@ -749,6 +753,20 @@ export default function App() {
     }
   }, [activeSession, cards, notify]);
 
+  const handleToggleCardSuspended = useCallback(
+    async (cardId: string, suspended: boolean) => {
+      const updated = cards.map((c) =>
+        c.id === cardId ? { ...c, suspended } : c
+      );
+      setCards(updated);
+      await putCards(updated.filter((c) => c.id === cardId));
+      if (suspended && activeSession?.smartReviewOnly && activeSession.smartCardIds?.includes(cardId)) {
+        setActiveSession(null);
+      }
+    },
+    [activeSession, cards]
+  );
+
   const handleRateCard = useCallback(
     (cardId: string, confidence: ConfidenceLevel) => {
       const outcome: 'hard' | 'good' | 'easy' =
@@ -933,7 +951,7 @@ export default function App() {
 
   // Launch the guided Leech Lab: flashcards over leech cards only
   const handleStartLeechLab = useCallback(() => {
-    const leeches = languageCards.filter(isLeechCard);
+    const leeches = languageCards.filter((c) => !c.suspended && isLeechCard(c));
     if (leeches.length === 0) {
       notify('No leech cards right now — nice work', 'info');
       return;
@@ -951,7 +969,7 @@ export default function App() {
 
   // One-click "Review Now" from the due-today banner
   const handleStartDueReview = useCallback(() => {
-    const due = languageCards.filter((c) => isCardDue(c));
+    const due = languageCards.filter((c) => !c.suspended && isCardDue(c));
     if (due.length === 0) {
       notify('Nothing due for review right now', 'info');
       return;
@@ -1350,13 +1368,21 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                aria-label={
+                  theme === 'light'
+                    ? 'Switch to dark mode'
+                    : theme === 'dark'
+                      ? 'Switch to system theme'
+                      : 'Switch to light mode'
+                }
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 {theme === 'light' ? (
                   <Moon className="w-4 h-4" />
-                ) : (
+                ) : theme === 'dark' ? (
                   <Sun className="w-4 h-4 text-[#F59E0B]" />
+                ) : (
+                  <Monitor className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -1582,6 +1608,10 @@ export default function App() {
                     cards={languageCards}
                     stats={studyStats}
                     onStartSmartReview={handleStartSmartReview}
+                    onboardingDismissed={appPrefs.onboardingDismissed ?? false}
+                    onDismissOnboarding={() =>
+                      setAppPrefs((prev) => ({ ...prev, onboardingDismissed: true }))
+                    }
                   />
                   <ActivitySection
                     activity={activity}
@@ -1610,6 +1640,7 @@ export default function App() {
                       onBulkAddCards={handleBulkAddCards}
                       onUpdateCard={handleUpdateCard}
                       onDeleteCard={handleDeleteCard}
+                      onToggleCardSuspended={handleToggleCardSuspended}
                       onBulkDeleteCards={handleBulkDeleteCards}
                       onBulkUpdateCards={handleBulkUpdateCards}
                       onImportDeckJson={handleImportDeckJson}

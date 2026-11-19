@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarClock, Flame, RefreshCw, Shuffle, Zap } from 'lucide-react';
+import { CalendarClock, Check, Circle, Flame, RefreshCw, Shuffle, X, Zap } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getReviewForecast, isCardDue, isWeakCard } from '../utils/srs';
@@ -10,6 +10,8 @@ interface OverviewStripProps {
   cards: VocabCard[];
   stats: StudyStats;
   onStartSmartReview: () => void;
+  onboardingDismissed: boolean;
+  onDismissOnboarding: () => void;
 }
 
 const DAILY_QUOTES: Array<{ text: string; author?: string }> = [
@@ -45,6 +47,8 @@ export function OverviewStrip({
   cards,
   stats,
   onStartSmartReview,
+  onboardingDismissed,
+  onDismissOnboarding,
 }: OverviewStripProps) {
   const [quoteOffset, setQuoteOffset] = useState(0);
   const [wordOffset, setWordOffset] = useState(0);
@@ -101,8 +105,64 @@ export function OverviewStrip({
       ? Math.round((stats.totalQuizCorrect / stats.totalQuizAnswered) * 100)
       : null;
 
+  // First-run checklist — auto-completes as the learner hits each milestone
+  const onboardingSteps = useMemo(() => {
+    const hasSession =
+      stats.totalQuizAnswered > 0 || stats.streakDays > 0 || stats.totalQuizCorrect > 0;
+    return [
+      { label: 'Create a deck for this language', done: decks.length > 0, hint: 'Use the deck selector above to add one' },
+      { label: 'Add your first words', done: cards.length > 0, hint: 'Press "+ New Word" or bulk-import a list' },
+      { label: 'Complete a study session', done: hasSession, hint: 'Start a quiz or flashcard round from the deck view' },
+      { label: 'Check your progress here', done: false, hint: 'Stats, forecast and session history live below' },
+    ];
+  }, [decks.length, cards.length, stats]);
+
+  const onboardingDoneCount = onboardingSteps.filter((s) => s.done).length;
+  const showOnboarding =
+    !onboardingDismissed && onboardingDoneCount < onboardingSteps.length - 1;
+
   return (
     <section className="space-y-4">
+      {showOnboarding && (
+        <div className="px-5 py-4 rounded-2xl bg-white dark:bg-[#1C1A17] border border-[#B45309]/30 dark:border-[#D97706]/30">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                Get started
+              </div>
+              <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                {onboardingDoneCount} of {onboardingSteps.length - 1} setup steps complete
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onDismissOnboarding}
+              aria-label="Dismiss getting started checklist"
+              className="p-1.5 -m-1 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {onboardingSteps.map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm">
+                {step.done ? (
+                  <Check className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Circle className="w-4 h-4 mt-0.5 shrink-0 text-[#C4BEB4] dark:text-[#443E37]" />
+                )}
+                <span className={step.done ? 'text-[#78716C] dark:text-[#A8A29E] line-through' : 'text-[#1C1917] dark:text-[#F5F2EC]'}>
+                  {step.label}
+                  {!step.done && (
+                    <span className="block text-[11px] text-[#78716C] dark:text-[#A8A29E]">{step.hint}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Row 1: Daily Motivation + Smart Review & Word of the Day */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
         {/* Left column: Daily Quote + Smart Review Quick Action */}

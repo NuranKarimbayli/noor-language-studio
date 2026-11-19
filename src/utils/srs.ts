@@ -128,20 +128,21 @@ export function getSmartReviewCards(
   cards: VocabCard[],
   nowMs = Date.now()
 ): { pool: VocabCard[]; mode: 'weak' | 'due' | 'all' } {
-  const weak = sortCardsBySrsPriority(cards.filter(isWeakCard), nowMs);
+  const active = cards.filter((c) => !c.suspended);
+  const weak = sortCardsBySrsPriority(active.filter(isWeakCard), nowMs);
   if (weak.length > 0) {
     return { pool: weak, mode: 'weak' };
   }
 
   const due = sortCardsBySrsPriority(
-    cards.filter((c) => isCardDue(c, nowMs)),
+    active.filter((c) => isCardDue(c, nowMs)),
     nowMs
   );
   if (due.length > 0) {
     return { pool: due, mode: 'due' };
   }
 
-  return { pool: sortCardsBySrsPriority(cards, nowMs), mode: 'all' };
+  return { pool: sortCardsBySrsPriority(active, nowMs), mode: 'all' };
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +233,7 @@ export function matchesSmartFilter(
   filter: SmartDeckFilter,
   nowMs = Date.now()
 ): boolean {
+  if (card.suspended) return false;
   const checks: boolean[] = [];
   if (filter.weak) checks.push(isWeakCard(card));
   if (filter.due) checks.push(isCardDue(card, nowMs));
@@ -271,6 +273,7 @@ export function getReviewForecast(
   let thisWeek = 0;
 
   for (const card of cards) {
+    if (card.suspended) continue;
     const dueMs = card.nextReviewAt ? Date.parse(card.nextReviewAt) : NaN;
     if (Number.isNaN(dueMs)) {
       // Never scheduled or unparseable -> due immediately

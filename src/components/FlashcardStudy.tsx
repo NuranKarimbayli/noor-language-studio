@@ -128,6 +128,7 @@ export function FlashcardStudy({
     let pool = cards.filter(
       (c) =>
         sessionConfig.deckIds.includes(c.deckId) &&
+        !c.suspended &&
         matchesDifficultyFilter(c, sessionConfig.difficultyFilter)
     );
 

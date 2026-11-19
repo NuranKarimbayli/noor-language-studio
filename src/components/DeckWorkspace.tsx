@@ -2,6 +2,8 @@ import { ChangeEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, u
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
+  Archive,
+  ArchiveRestore,
   BookOpen,
   FileDown,
   FileUp,
@@ -66,6 +68,7 @@ interface DeckWorkspaceProps {
     }
   ) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
+  onToggleCardSuspended: (cardId: string, suspended: boolean) => Promise<void> | void;
   onBulkDeleteCards: (cardIds: string[]) => Promise<void>;
   onBulkUpdateCards: (
     cardIds: string[],
@@ -150,6 +153,7 @@ export function DeckWorkspace({
   onBulkAddCards,
   onUpdateCard,
   onDeleteCard,
+  onToggleCardSuspended,
   onBulkDeleteCards,
   onBulkUpdateCards,
   onImportDeckJson,
@@ -187,6 +191,7 @@ export function DeckWorkspace({
 
   // Smart deck selection + creation state
   const [selectedSmartDeckId, setSelectedSmartDeckId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [smartDeckName, setSmartDeckName] = useState('');
   const [smartDeckDesc, setSmartDeckDesc] = useState('');
   const [smartDeckFilter, setSmartDeckFilter] = useState<SmartDeckFilter>({});
@@ -267,13 +272,12 @@ export function DeckWorkspace({
     [cards, smartDeckFilter]
   );
 
-  const viewCards = useMemo(
-    () =>
-      activeSmartDeck
-        ? getSmartDeckCards(cards, activeSmartDeck.filter)
-        : deckCards,
-    [activeSmartDeck, cards, deckCards]
-  );
+  const viewCards = useMemo(() => {
+    const base = activeSmartDeck
+      ? getSmartDeckCards(cards, activeSmartDeck.filter)
+      : deckCards;
+    return showArchived ? base : base.filter((c) => !c.suspended);
+  }, [activeSmartDeck, cards, deckCards, showArchived]);
 
   // Single pass over cards to avoid O(decks × cards) filtering on every render
   const cardCountsByDeck = useMemo(() => {
@@ -1264,6 +1268,20 @@ export function DeckWorkspace({
                 >
                   {selectionMode ? 'Done' : 'Select'}
                 </button>
+                {deckCards.some((c) => c.suspended) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchived((v) => !v)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1 ${
+                      showArchived
+                        ? 'bg-[#B45309] text-white'
+                        : 'text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                    }`}
+                  >
+                    <Archive className="w-3 h-3" />
+                    {showArchived ? 'Hide archived' : 'Archived'}
+                  </button>
+                )}
                 <div
                   role="group"
                   aria-label="Filter words by confidence"
@@ -1411,7 +1429,7 @@ export function DeckWorkspace({
                         selectionMode && selectedCardIds.has(card.id)
                           ? 'bg-[#B45309]/5 dark:bg-[#D97706]/10'
                           : ''
-                      }`}
+                      } ${card.suspended ? 'opacity-55' : ''}`}
                     >
                       {selectionMode && (
                         <input
@@ -1427,6 +1445,12 @@ export function DeckWorkspace({
                           <span className="font-display text-lg font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
                             {card.word}
                           </span>
+                          {card.suspended && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-200/70 dark:bg-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] text-[11px] font-semibold">
+                              <Archive className="w-3 h-3" />
+                              Archived
+                            </span>
+                          )}
                           <SpeakButton
                             text={card.word}
                             langCode={languageCode}
@@ -1501,6 +1525,36 @@ export function DeckWorkspace({
                               >
                                 <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setOpenCardMenuId(null);
+                                  try {
+                                    await onToggleCardSuspended(card.id, !card.suspended);
+                                    onNotify(
+                                      card.suspended
+                                        ? `"${card.word}" restored to study.`
+                                        : `"${card.word}" archived — hidden from quizzes and reviews.`,
+                                      'success'
+                                    );
+                                  } catch {
+                                    onNotify('Could not update the card. Please try again.', 'error');
+                                  }
+                                }}
+                                className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                              >
+                                {card.suspended ? (
+                                  <>
+                                    <ArchiveRestore className="w-3.5 h-3.5 text-[#78716C]" />
+                                    Restore
+                                  </>
+                                ) : (
+                                  <>
+                                    <Archive className="w-3.5 h-3.5 text-[#78716C]" />
+                                    Archive
+                                  </>
+                                )}
                               </button>
                               <button
                                 type="button"

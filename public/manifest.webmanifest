@@ -1,0 +1,20 @@
+{
+  "name": "Noor Language Studio",
+  "short_name": "Noor Studio",
+  "description": "Minimalist vocabulary and language learning studio with flashcards, spaced repetition, and quizzes.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FAF8F5",
+  "theme_color": "#B45309",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1045x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

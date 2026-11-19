@@ -3,6 +3,7 @@ import {
   Bell,
   FastForward,
   Keyboard,
+  Monitor,
   Moon,
   RotateCcw,
   Sun,
@@ -186,11 +187,12 @@ export function SettingsModal({
             <div className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
               Theme
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {(
                 [
                   { id: 'light' as ThemeMode, label: 'Light', Icon: Sun },
                   { id: 'dark' as ThemeMode, label: 'Dark', Icon: Moon },
+                  { id: 'system' as ThemeMode, label: 'System', Icon: Monitor },
                 ]
               ).map((opt) => (
                 <button

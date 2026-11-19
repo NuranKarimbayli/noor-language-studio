@@ -16,7 +16,7 @@ export type SessionMode = 'flashcards' | QuizMode;
 
 export type AppStage = 'categories' | 'languages' | 'workspace';
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface LanguageItem {
   id: string;
@@ -55,6 +55,9 @@ export interface VocabCard {
   nextReviewAt?: string;
   streak?: number;
   lapses?: number;
+  // Archived cards stay in the deck but are hidden from study sessions and
+  // (by default) the word list until restored.
+  suspended?: boolean;
 }
 
 export interface Deck {
@@ -131,6 +134,7 @@ export interface AppPrefs {
   autoSpeakPrompt: boolean; // speak the target word when a card/question appears
   autoSpeakAnswer: boolean; // speak the word/example again when the answer is revealed
   reminderEnabled: boolean; // browser Notification when reviews are due
+  onboardingDismissed?: boolean; // first-run checklist hidden
 }
 
 // Completed study session persisted in IndexedDB (session history)

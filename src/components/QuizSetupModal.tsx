@@ -171,7 +171,10 @@ export function QuizSetupModal({
   }, [open, onClose]);
 
   const selectedCards = useMemo(
-    () => cards.filter((c) => selectedDeckIds.includes(c.deckId)),
+    () =>
+      cards.filter(
+        (c) => selectedDeckIds.includes(c.deckId) && !c.suspended
+      ),
     [cards, selectedDeckIds]
   );
 
