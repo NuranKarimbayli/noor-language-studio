@@ -327,7 +327,7 @@ interface SpeechRecognitionLike {
   interimResults: boolean;
   onresult: ((event: { results: ArrayLike<SpeechRecognitionResultLike> }) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
@@ -357,7 +357,7 @@ export function startSpeechRecognition(
     onTranscript?: (text: string, isFinal: boolean) => void;
     onFinal?: (text: string) => void;
     onEnd?: () => void;
-    onError?: () => void;
+    onError?: (errorCode?: string) => void;
   }
 ): SpeechRecognitionSession | null {
   if (typeof window === 'undefined' || !isSpeechRecognitionSupported()) return null;
@@ -401,8 +401,9 @@ export function startSpeechRecognition(
     handlers.onEnd?.();
   };
 
-  rec.onerror = () => {
-    handlers.onError?.();
+  rec.onerror = (event) => {
+    const code = (event as { error?: string }).error;
+    handlers.onError?.(code);
     // onend typically follows onerror; guard against double-finalize
     if (!ended) {
       ended = true;

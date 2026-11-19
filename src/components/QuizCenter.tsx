@@ -140,8 +140,9 @@ export function QuizCenter({
   const [isListening, setIsListening] = useState(false);
   const [speechTranscript, setSpeechTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognitionSession | null>(null);
-  const speechTimeoutRef = useRef<number | null>(null);
+  const speechDeadlineRef = useRef(0);
   const speechDoneRef = useRef(false);
+  const speechFatalRef = useRef(false);
 
   // Smooth millisecond cooldown bar state
   const [remainingMs, setRemainingMs] = useState<number>(
@@ -634,58 +635,81 @@ export function QuizCenter({
     ) {
       return;
     }
-    if (speechTimeoutRef.current !== null) {
-      window.clearTimeout(speechTimeoutRef.current);
-      speechTimeoutRef.current = null;
-    }
     recognitionRef.current?.abort();
     speechDoneRef.current = false;
+    speechFatalRef.current = false;
+    // Total listening budget per question — restarts share this deadline.
+    speechDeadlineRef.current = performance.now() + 8000;
     setSpeechTranscript('');
     setIsListening(true);
-    recognitionRef.current = startSpeechRecognition(languageCode, {
-      onTranscript: (text, isFinal) => {
-        setSpeechTranscript(text);
-        // Chrome marks a phrase final once the utterance is complete — for a
-        // single vocab word that's the signal to score and move on.
-        if (isFinal && text.trim() && !speechDoneRef.current) {
-          speechDoneRef.current = true;
-          submitSpeechAnswer(text);
-          recognitionRef.current?.stop();
-        }
-      },
-      onFinal: (text) => {
-        setSpeechTranscript(text);
-        // Fires when the session ends (timeout/stop) with any transcript —
-        // covers the case where no result was ever marked final.
-        if (!speechDoneRef.current && text.trim()) {
-          speechDoneRef.current = true;
-          submitSpeechAnswer(text);
-        }
-      },
-      onEnd: () => {
-        if (speechTimeoutRef.current !== null) {
-          window.clearTimeout(speechTimeoutRef.current);
-          speechTimeoutRef.current = null;
-        }
+
+    const launch = () => {
+      // Bail if the question was answered or the session budget expired
+      // between scheduling and now (e.g. pending restart after navigation).
+      if (
+        speechDoneRef.current ||
+        speechFatalRef.current ||
+        performance.now() >= speechDeadlineRef.current
+      ) {
         setIsListening(false);
-      },
-      onError: () => {
-        if (speechTimeoutRef.current !== null) {
-          window.clearTimeout(speechTimeoutRef.current);
-          speechTimeoutRef.current = null;
-        }
+        return;
+      }
+      const session = startSpeechRecognition(languageCode, {
+        onTranscript: (text, isFinal) => {
+          setSpeechTranscript(text);
+          // Chrome marks a phrase final once the utterance is complete — for a
+          // single vocab word that's the signal to score and move on.
+          if (isFinal && text.trim() && !speechDoneRef.current) {
+            speechDoneRef.current = true;
+            submitSpeechAnswer(text);
+            session?.stop();
+          }
+        },
+        onFinal: (text) => {
+          setSpeechTranscript(text);
+          // Fires when the session ends with any transcript — covers speech
+          // that was never marked final before the session terminated.
+          if (!speechDoneRef.current && text.trim()) {
+            speechDoneRef.current = true;
+            submitSpeechAnswer(text);
+          }
+        },
+        onEnd: () => {
+          // Ignore events from a superseded recognizer (mic re-click,
+          // question change, unmount).
+          if (recognitionRef.current !== session) return;
+          // The browser ended the session early (silence, no-speech, etc.).
+          // Keep-alive: relaunch while budget remains and nothing scored —
+          // this is what gives the learner a real window to speak.
+          if (
+            speechDoneRef.current ||
+            speechFatalRef.current ||
+            performance.now() >= speechDeadlineRef.current
+          ) {
+            setIsListening(false);
+            return;
+          }
+          window.setTimeout(launch, 250);
+        },
+        onError: (code) => {
+          // Fatal errors can't be retried; transient ones (no-speech,
+          // network, aborted) are handled by the onEnd restart path.
+          if (
+            code === 'not-allowed' ||
+            code === 'service-not-allowed' ||
+            code === 'audio-capture'
+          ) {
+            speechFatalRef.current = true;
+          }
+        },
+      });
+      recognitionRef.current = session;
+      if (!session) {
         setIsListening(false);
-      },
-    });
-    if (!recognitionRef.current) {
-      setIsListening(false);
-      return;
-    }
-    // Continuous recognition never self-terminates — cap each attempt so a
-    // silent mic can't hold the session open indefinitely.
-    speechTimeoutRef.current = window.setTimeout(() => {
-      recognitionRef.current?.stop();
-    }, 8000);
+      }
+    };
+
+    launch();
   }, [
     currentQuestion,
     currentRecord,
@@ -707,12 +731,9 @@ export function QuizCenter({
     ) {
       startListening();
       return () => {
-        if (speechTimeoutRef.current !== null) {
-          window.clearTimeout(speechTimeoutRef.current);
-          speechTimeoutRef.current = null;
-        }
         recognitionRef.current?.abort();
         recognitionRef.current = null;
+        speechDoneRef.current = true;
         setIsListening(false);
       };
     }
@@ -1012,12 +1033,9 @@ export function QuizCenter({
         window.cancelAnimationFrame(timerRafRef.current);
         timerRafRef.current = null;
       }
-      if (speechTimeoutRef.current !== null) {
-        window.clearTimeout(speechTimeoutRef.current);
-        speechTimeoutRef.current = null;
-      }
       recognitionRef.current?.abort();
       recognitionRef.current = null;
+      speechDoneRef.current = true;
       stopSpeaking();
     };
   }, []);
