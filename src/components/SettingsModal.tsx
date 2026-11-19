@@ -30,6 +30,12 @@ interface SettingsModalProps {
   onDefaultTimerChange: (seconds: number) => void;
   onResetDefaults: () => void;
   onResetStatistics: () => Promise<void> | void;
+  autoSpeakPrompt: boolean;
+  onAutoSpeakPromptChange: (enabled: boolean) => void;
+  autoSpeakAnswer: boolean;
+  onAutoSpeakAnswerChange: (enabled: boolean) => void;
+  reminderEnabled: boolean;
+  onReminderChange: (enabled: boolean) => void;
 }
 
 function Toggle({
@@ -113,6 +119,12 @@ export function SettingsModal({
   onDefaultTimerChange,
   onResetDefaults,
   onResetStatistics,
+  autoSpeakPrompt,
+  onAutoSpeakPromptChange,
+  autoSpeakAnswer,
+  onAutoSpeakAnswerChange,
+  reminderEnabled,
+  onReminderChange,
 }: SettingsModalProps) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -207,6 +219,12 @@ export function SettingsModal({
             label="Toast notifications"
             description="Show success and info toasts. Errors and Undo actions always appear."
           />
+          <Toggle
+            checked={reminderEnabled}
+            onChange={onReminderChange}
+            label="Review reminders"
+            description="Browser notification (once a day) when cards are due for review. Requires notification permission."
+          />
         </Section>
 
         {/* Audio */}
@@ -222,6 +240,18 @@ export function SettingsModal({
             onChange={onSpeechChange}
             label="Pronunciation voice"
             description="Speak words aloud in decks, flashcards, and quizzes when a native voice exists."
+          />
+          <Toggle
+            checked={autoSpeakPrompt}
+            onChange={onAutoSpeakPromptChange}
+            label="Auto-speak prompts"
+            description="Automatically pronounce the target word when a new flashcard or quiz question appears."
+          />
+          <Toggle
+            checked={autoSpeakAnswer}
+            onChange={onAutoSpeakAnswerChange}
+            label="Auto-speak answers"
+            description="Automatically pronounce the word or example sentence when an answer is revealed."
           />
         </Section>
 

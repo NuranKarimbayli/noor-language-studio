@@ -62,6 +62,11 @@ interface DeckWorkspaceProps {
     }
   ) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
+  onBulkDeleteCards: (cardIds: string[]) => Promise<void>;
+  onBulkUpdateCards: (
+    cardIds: string[],
+    updates: { deckId?: string; difficulty?: DifficultyLevel }
+  ) => Promise<void>;
   onImportDeckJson: (payload: {
     deckName: string;
     description: string;
@@ -118,6 +123,8 @@ export function DeckWorkspace({
   onBulkAddCards,
   onUpdateCard,
   onDeleteCard,
+  onBulkDeleteCards,
+  onBulkUpdateCards,
   onImportDeckJson,
   onPracticeDeck,
   onNotify,
@@ -141,6 +148,11 @@ export function DeckWorkspace({
   const [openDeckMenuId, setOpenDeckMenuId] = useState<string | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+
+  // Bulk multi-select state for the word list
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [bulkMoveDeckId, setBulkMoveDeckId] = useState('');
 
   // Deck form state
   const [deckName, setDeckName] = useState('');
@@ -275,6 +287,57 @@ export function DeckWorkspace({
   }, [confidenceFilter]);
 
   const bulkParsed = useMemo(() => parseBulkLines(bulkText), [bulkText]);
+
+  // Bulk selection helpers — selection is scoped to the current deck
+  useEffect(() => {
+    setSelectedCardIds(new Set());
+    setBulkMoveDeckId('');
+  }, [selectedDeckId]);
+
+  const toggleCardSelection = useCallback((cardId: string) => {
+    setSelectedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedCardIds(new Set());
+    setBulkMoveDeckId('');
+  }, []);
+
+  const runBulkMove = async (deckId: string) => {
+    if (!deckId || selectedCardIds.size === 0) return;
+    try {
+      await onBulkUpdateCards([...selectedCardIds], { deckId });
+      exitSelectionMode();
+    } catch {
+      onNotify('Could not move the words. Please try again.', 'error');
+    }
+  };
+
+  const runBulkDifficulty = async (difficulty: DifficultyLevel) => {
+    if (selectedCardIds.size === 0) return;
+    try {
+      await onBulkUpdateCards([...selectedCardIds], { difficulty });
+      exitSelectionMode();
+    } catch {
+      onNotify('Could not update difficulty. Please try again.', 'error');
+    }
+  };
+
+  const runBulkDelete = async () => {
+    if (selectedCardIds.size === 0) return;
+    try {
+      await onBulkDeleteCards([...selectedCardIds]);
+      exitSelectionMode();
+    } catch {
+      onNotify('Could not delete the words. Please try again.', 'error');
+    }
+  };
 
   // Non-blocking duplicate warning: same word (case/diacritic-insensitive)
   // already present in the target deck
@@ -928,11 +991,25 @@ export function DeckWorkspace({
                 </button>
               </div>
 
-              <div
-                role="group"
-                aria-label="Filter words by confidence"
-                className="flex items-center gap-1 text-xs"
-              >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    selectionMode ? exitSelectionMode() : setSelectionMode(true)
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                    selectionMode
+                      ? 'bg-[#B45309] text-white'
+                      : 'text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                  }`}
+                >
+                  {selectionMode ? 'Done' : 'Select'}
+                </button>
+                <div
+                  role="group"
+                  aria-label="Filter words by confidence"
+                  className="flex items-center gap-1 text-xs"
+                >
                 {CONFIDENCE_FILTERS.map((f) => {
                   const active = confidenceFilter === f.value;
                   return (
@@ -950,7 +1027,65 @@ export function DeckWorkspace({
                     </button>
                   );
                 })}
+                </div>
               </div>
+            </div>
+          )}
+
+          {/* Bulk action bar (visible in selection mode) */}
+          {selectionMode && deckCards.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 rounded-2xl bg-[#F3EFE8]/80 dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25]">
+              <span className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
+                {selectedCardIds.size} selected
+              </span>
+              {selectedCardIds.size > 0 && (
+                <>
+                  <select
+                    value={bulkMoveDeckId}
+                    onChange={(e) => {
+                      const deckId = e.target.value;
+                      setBulkMoveDeckId(deckId);
+                      if (deckId) void runBulkMove(deckId);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#2E2A25] text-xs text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                    aria-label="Move selected words to deck"
+                  >
+                    <option value="">Move to deck…</option>
+                    {decks
+                      .filter((d) => d.id !== selectedDeck?.id)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="flex items-center gap-1">
+                    {DIFFICULTY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => void runBulkDifficulty(opt.value)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#2E2A25] bg-white dark:bg-[#25221E] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309] transition-colors capitalize"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void runBulkDelete()}
+                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </>
+              )}
+              {selectedCardIds.size === 0 && (
+                <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                  Tap the checkboxes next to words to select them
+                </span>
+              )}
             </div>
           )}
 
@@ -1007,9 +1142,22 @@ export function DeckWorkspace({
                   return (
                     <li
                       key={card.id}
-                      className="group px-5 py-4 flex items-start justify-between gap-4 hover:bg-[#FAF8F5]/60 dark:hover:bg-[#221E1A]/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                      className={`group px-5 py-4 flex items-start gap-3.5 hover:bg-[#FAF8F5]/60 dark:hover:bg-[#221E1A]/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl ${
+                        selectionMode && selectedCardIds.has(card.id)
+                          ? 'bg-[#B45309]/5 dark:bg-[#D97706]/10'
+                          : ''
+                      }`}
                     >
-                      <div className="space-y-1 min-w-0">
+                      {selectionMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedCardIds.has(card.id)}
+                          onChange={() => toggleCardSelection(card.id)}
+                          aria-label={`Select ${card.word}`}
+                          className="mt-1.5 w-4 h-4 shrink-0 rounded border-slate-300 dark:border-[#3A352F] accent-[#B45309] cursor-pointer"
+                        />
+                      )}
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                           <span className="font-display text-lg font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
                             {card.word}

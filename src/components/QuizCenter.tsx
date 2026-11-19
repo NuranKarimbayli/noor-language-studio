@@ -18,6 +18,7 @@ import {
   QuizAnswerRecord,
   QuizMode,
   QuizQuestion,
+  QuizSessionSummary,
   SessionConfig,
   VocabCard,
 } from '../types';
@@ -47,12 +48,14 @@ interface QuizCenterProps {
   sessionConfig: SessionConfig & { mode: QuizMode };
   sfxMuted: boolean;
   onRecordAnswer: (cardId: string, isCorrect: boolean, isExact: boolean) => void;
-  onQuizComplete?: (bestStreak: number) => void;
+  onQuizComplete?: (summary: QuizSessionSummary) => void;
   onOpenSetup: () => void;
   onBackToWorkspace: () => void;
   ttsMuted?: boolean;
   voice?: VoiceSelection | null;
   autoAdvance?: boolean;
+  autoSpeakPrompt?: boolean;
+  autoSpeakAnswer?: boolean;
 }
 
 type QuizPhase = 'running' | 'results';
@@ -118,6 +121,8 @@ export function QuizCenter({
   ttsMuted = false,
   voice,
   autoAdvance = false,
+  autoSpeakPrompt = false,
+  autoSpeakAnswer = false,
 }: QuizCenterProps) {
   const [phase, setPhase] = useState<QuizPhase>('running');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -141,6 +146,9 @@ export function QuizCenter({
   const answerInputRef = useRef<HTMLInputElement>(null);
   const timerRafRef = useRef<number | null>(null);
   const submissionLockRef = useRef(false);
+  const sessionStartRef = useRef<number>(performance.now());
+  const recordsRef = useRef<QuizAnswerRecord[]>([]);
+  recordsRef.current = records;
 
   // Cooldown timer internals: wall-clock deadline + direct DOM writes
   const cooldownBarRef = useRef<HTMLDivElement>(null);
@@ -314,6 +322,7 @@ export function QuizCenter({
       cooldownDeadlineRef.current = null;
       armedQuestionKeyRef.current = null;
       setPhase('running');
+      sessionStartRef.current = performance.now();
     },
     [buildQuestions, sessionConfig]
   );
@@ -387,6 +396,63 @@ export function QuizCenter({
     currentRecord,
     ttsMuted,
     voiceSupported,
+    voice,
+    languageCode,
+  ]);
+
+  // Auto-speak the prompt: only when the prompt itself is the target-language
+  // word (word-to-translation). Listening mode already auto-pronounces.
+  useEffect(() => {
+    if (
+      phase !== 'running' ||
+      currentRecord ||
+      !autoSpeakPrompt ||
+      ttsMuted ||
+      !voiceSupported ||
+      !currentQuestion ||
+      sessionConfig.mode === 'listening' ||
+      currentQuestion.direction !== 'word-to-translation'
+    ) {
+      return;
+    }
+    speakText(
+      currentQuestion.promptText,
+      currentQuestion.langCode || languageCode,
+      voice
+    );
+  }, [
+    phase,
+    currentRecord,
+    autoSpeakPrompt,
+    ttsMuted,
+    voiceSupported,
+    currentQuestion,
+    sessionConfig.mode,
+    voice,
+    languageCode,
+  ]);
+
+  // Auto-speak the answer context on reveal: example sentence when present,
+  // otherwise the target word itself.
+  useEffect(() => {
+    if (
+      !currentRecord ||
+      !autoSpeakAnswer ||
+      ttsMuted ||
+      !voiceSupported ||
+      !currentQuestion
+    ) {
+      return;
+    }
+    const text =
+      currentQuestion.card.exampleSentence ?? currentQuestion.card.word;
+    speakText(text, currentQuestion.langCode || languageCode, voice);
+  }, [
+    currentRecord,
+    autoSpeakAnswer,
+    ttsMuted,
+    voiceSupported,
+    currentQuestion,
     voice,
     languageCode,
   ]);
@@ -641,7 +707,14 @@ export function QuizCenter({
     if (currentIdx + 1 >= questions.length) {
       setPhase('results');
       playCompleteSound(sfxMuted);
-      onQuizComplete?.(bestStreak);
+      const answered = recordsRef.current;
+      onQuizComplete?.({
+        mode: sessionConfig.mode,
+        total: questions.length,
+        correct: answered.filter((r) => r.isCorrect).length,
+        durationMs: Math.max(0, performance.now() - sessionStartRef.current),
+        bestStreak,
+      });
     } else {
       setCurrentIdx((i) => i + 1);
       setCurrentRecord(null);
@@ -650,7 +723,7 @@ export function QuizCenter({
       setFeedbackPulse(null);
       setRemainingMs(sessionConfig.timerSeconds * 1000);
     }
-  }, [currentRecord, currentIdx, questions.length, sessionConfig.timerSeconds, sfxMuted, bestStreak, onQuizComplete]);
+  }, [currentRecord, currentIdx, questions.length, sessionConfig.timerSeconds, sessionConfig.mode, sfxMuted, bestStreak, onQuizComplete]);
 
   // Auto-advance to the next question ~1.5s after an answer is recorded
   useEffect(() => {

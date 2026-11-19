@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { Flame, Minus, Plus, Target, TrendingUp } from 'lucide-react';
-import { ActivityDay, VocabCard } from '../types';
+import { Bug, Flame, History, Minus, Plus, Target, TrendingUp } from 'lucide-react';
+import { ActivityDay, SessionMode, SessionRecord, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
+import { isLeechCard } from '../utils/srs';
 
 interface ActivitySectionProps {
   activity: ActivityDay[];
@@ -10,6 +11,8 @@ interface ActivitySectionProps {
   cards: VocabCard[];
   deckNameFor: (deckId: string) => string;
   onPracticeMistakes: (cardIds: string[]) => void;
+  sessions: SessionRecord[];
+  onStartLeechLab: () => void;
 }
 
 const HEATMAP_WEEKS = 16;
@@ -17,6 +20,90 @@ const GOAL_STEP = 5;
 const GOAL_MIN = 5;
 const GOAL_MAX = 200;
 const MISTAKE_BANK_SIZE = 10;
+
+const SESSION_MODE_LABELS: Record<SessionMode, string> = {
+  flashcards: 'Flashcards',
+  'true-false': 'True/False',
+  'multiple-choice': 'Quiz',
+  listening: 'Listening',
+  typing: 'Typing',
+  'fill-blank': 'Fill Blank',
+};
+
+function formatSessionTime(iso: string): string {
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatDuration(durationMs: number): string {
+  const secs = Math.round(durationMs / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+}
+
+/** Lightweight SVG accuracy sparkline over the most recent sessions. */
+function AccuracySparkline({ sessions }: { sessions: SessionRecord[] }) {
+  const points = useMemo(
+    () => [...sessions].slice(0, 10).reverse(),
+    [sessions]
+  );
+  if (points.length < 2) return null;
+
+  const W = 260;
+  const H = 56;
+  const PAD = 6;
+  const stepX = (W - PAD * 2) / (points.length - 1);
+  const coords = points.map((s, i) => {
+    const acc = s.total > 0 ? s.correct / s.total : 0;
+    return {
+      x: PAD + i * stepX,
+      y: H - PAD - acc * (H - PAD * 2),
+      acc,
+    };
+  });
+  const line = coords.map((c) => `${c.x},${c.y}`).join(' ');
+  const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`;
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full h-14"
+      role="img"
+      aria-label="Quiz accuracy trend over recent sessions"
+      preserveAspectRatio="none"
+    >
+      <polygon points={area} className="fill-[#B45309]/10 dark:fill-[#D97706]/10" />
+      <polyline
+        points={line}
+        fill="none"
+        className="stroke-[#B45309] dark:stroke-[#D97706]"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      {coords.map((c, i) => (
+        <circle
+          key={i}
+          cx={c.x}
+          cy={c.y}
+          r="2.5"
+          className="fill-[#B45309] dark:fill-[#D97706]"
+        />
+      ))}
+    </svg>
+  );
+}
 
 function dayActivityValue(day: ActivityDay | undefined): number {
   if (!day) return 0;
@@ -52,6 +139,8 @@ export function ActivitySection({
   cards,
   deckNameFor,
   onPracticeMistakes,
+  sessions,
+  onStartLeechLab,
 }: ActivitySectionProps) {
   const activityByDate = useMemo(() => {
     const map = new Map<string, ActivityDay>();
@@ -101,6 +190,10 @@ export function ActivitySection({
       .slice(0, MISTAKE_BANK_SIZE);
   }, [cards]);
 
+  const leechCount = useMemo(() => cards.filter(isLeechCard).length, [cards]);
+
+  const recentSessions = sessions.slice(0, 6);
+
   const adjustGoal = (delta: number) => {
     onDailyGoalChange(
       Math.min(GOAL_MAX, Math.max(GOAL_MIN, dailyGoal + delta))
@@ -108,6 +201,7 @@ export function ActivitySection({
   };
 
   return (
+    <div className="space-y-6">
     <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
       {/* Activity Heatmap + Daily Goal */}
       <div className="lg:col-span-2 bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-5">
@@ -256,9 +350,108 @@ export function ActivitySection({
               <Flame className="w-4 h-4" />
               Practice Mistakes ({mistakeBank.length})
             </button>
+            {leechCount > 0 && (
+              <button
+                type="button"
+                onClick={onStartLeechLab}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+              >
+                <Bug className="w-4 h-4" />
+                Leech Lab ({leechCount})
+              </button>
+            )}
           </>
         )}
       </div>
     </section>
+
+    {/* Session History & Accuracy Trend */}
+    <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+            Session History
+          </h3>
+          <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+            Completed study sessions and accuracy trend
+          </p>
+        </div>
+        <History className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />
+      </div>
+
+      {sessions.length === 0 ? (
+        <p className="text-xs text-[#78716C] dark:text-[#A8A29E] py-4 text-center">
+          No sessions completed yet — finish a quiz or flashcard round to start
+          tracking accuracy.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
+              Accuracy — last {Math.min(sessions.length, 10)} sessions
+            </div>
+            <AccuracySparkline sessions={sessions} />
+            <div className="flex items-center justify-between text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+              <span>Older</span>
+              <span>
+                {(() => {
+                  const recent = sessions.slice(0, Math.min(sessions.length, 10));
+                  const avg =
+                    recent.reduce(
+                      (sum, s) => sum + (s.total > 0 ? s.correct / s.total : 0),
+                      0
+                    ) / recent.length;
+                  return `${Math.round(avg * 100)}% avg`;
+                })()}
+              </span>
+              <span>Recent</span>
+            </div>
+          </div>
+
+          <ul className="divide-y divide-slate-100 dark:divide-[#2E2A25] -mx-2">
+            {recentSessions.map((s) => {
+              const acc = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0;
+              return (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 px-2 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] truncate">
+                      {SESSION_MODE_LABELS[s.mode] ?? s.mode}
+                    </div>
+                    <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                      {s.deckNames.length > 0
+                        ? s.deckNames.slice(0, 2).join(', ') +
+                          (s.deckNames.length > 2 ? ` +${s.deckNames.length - 2}` : '')
+                        : 'All decks'}
+                      {' · '}
+                      {formatSessionTime(s.completedAt)}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div
+                      className={`font-mono text-sm font-semibold tabular-nums ${
+                        acc >= 80
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : acc >= 50
+                            ? 'text-amber-700 dark:text-amber-400'
+                            : 'text-red-700 dark:text-red-400'
+                      }`}
+                    >
+                      {acc}%
+                    </div>
+                    <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                      {s.correct}/{s.total} · {formatDuration(s.durationMs)}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+    </div>
   );
 }

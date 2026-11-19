@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, AudioLines, Keyboard, MicOff, Moon, Plus, Settings2, Sun, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, AudioLines, CalendarClock, Keyboard, MicOff, Moon, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { CategoryScreen } from './components/CategoryScreen';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -23,7 +23,10 @@ import {
   DifficultyLevel,
   LanguageItem,
   QuizMode,
+  QuizSessionSummary,
+  SessionCompletionSummary,
   SessionConfig,
+  SessionRecord,
   StudyStats,
   ThemeMode,
   ToastMessage,
@@ -31,7 +34,14 @@ import {
 } from './types';
 import { cleanupAudioContext } from './utils/soundEffects';
 import { preloadVoices, stopSpeaking } from './utils/speechUtils';
-import { applySrsOutcome, getSmartReviewCards } from './utils/srs';
+import {
+  applySrsOutcome,
+  getReviewForecast,
+  getSmartReviewCards,
+  graduateLeechCard,
+  isCardDue,
+  isLeechCard,
+} from './utils/srs';
 import {
   applyStudyActivity,
   buildBackupPayload,
@@ -44,8 +54,10 @@ import {
   addCard,
   addDeck,
   addLanguage,
+  addSessionRecord,
   clearAllData,
   deleteCard as dbDeleteCard,
+  deleteCardsByIds,
   deleteDeck as dbDeleteDeck,
   deleteCardsByDeck,
   deleteCardsByDecks,
@@ -57,6 +69,7 @@ import {
   getAllLanguages,
   getAppPrefs,
   getSfxMuted,
+  getSessionHistory,
   getStats,
   getTheme,
   getTtsMuted,
@@ -109,10 +122,15 @@ export default function App() {
   const [sfxMuted, setSfxMuted] = useState<boolean>(false);
   const [ttsMuted, setTtsMuted] = useState<boolean>(false);
   const [activity, setActivity] = useState<ActivityDay[]>([]);
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [dueBannerDismissedFor, setDueBannerDismissedFor] = useState<string>('');
   const [appPrefs, setAppPrefs] = useState<AppPrefs>({
     showToasts: true,
     autoAdvance: false,
     defaultTimerSeconds: 0,
+    autoSpeakPrompt: false,
+    autoSpeakAnswer: false,
+    reminderEnabled: false,
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -134,6 +152,7 @@ export default function App() {
           loadedTtsMuted,
           loadedActivity,
           loadedPrefs,
+          loadedSessions,
         ] = await Promise.all([
           getAllLanguages(),
           getAllDecks(),
@@ -144,6 +163,7 @@ export default function App() {
           getTtsMuted(),
           getActivityHistory(),
           getAppPrefs(),
+          getSessionHistory(50),
         ]);
 
         setLanguages(loadedLanguages);
@@ -154,6 +174,7 @@ export default function App() {
         setSfxMuted(loadedSfxMuted);
         setTtsMuted(loadedTtsMuted);
         setActivity(loadedActivity);
+        setSessions(loadedSessions);
         setAppPrefs(loadedPrefs);
 
         setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
@@ -219,6 +240,36 @@ export default function App() {
     };
   }, []);
 
+  // Optional browser reminders: at most one Notification per day, only when
+  // cards are actually due and permission was granted in Settings.
+  useEffect(() => {
+    if (
+      !appPrefs.reminderEnabled ||
+      typeof Notification === 'undefined' ||
+      Notification.permission !== 'granted'
+    ) {
+      return;
+    }
+    const maybeNotify = () => {
+      const due = getReviewForecast(cards).today;
+      if (due <= 0) return;
+      const today = getLocalDateString();
+      if (localStorage.getItem('noor_last_review_reminder') === today) return;
+      localStorage.setItem('noor_last_review_reminder', today);
+      try {
+        const notification = new Notification('Noor Language Studio', {
+          body: `${due} ${due === 1 ? 'card is' : 'cards are'} due for review today.`,
+        });
+        notification.onclick = () => window.focus();
+      } catch {
+        // Notification constructor can throw in restricted contexts
+      }
+    };
+    maybeNotify();
+    const intervalId = window.setInterval(maybeNotify, 30 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [appPrefs.reminderEnabled, cards]);
+
   const activeLanguage = useMemo(
     () =>
       languages.find((l) => l.id === activeLanguageId) ??
@@ -237,6 +288,17 @@ export default function App() {
     const deckIds = new Set(languageDecks.map((d) => d.id));
     return cards.filter((c) => deckIds.has(c.deckId));
   }, [cards, languageDecks]);
+
+  // Due-today count for the workspace entry banner
+  const dueTodayCount = useMemo(
+    () => getReviewForecast(languageCards).today,
+    [languageCards]
+  );
+  const showDueBanner =
+    stage === 'workspace' &&
+    !activeSession &&
+    dueTodayCount > 0 &&
+    dueBannerDismissedFor !== getLocalDateString();
 
   // TTS voice binding for the active language
   const activeVoice = useMemo(
@@ -304,15 +366,24 @@ export default function App() {
     setTheme('light');
     setSfxMuted(false);
     setTtsMuted(false);
-    setAppPrefs({ showToasts: true, autoAdvance: false, defaultTimerSeconds: 0 });
+    setAppPrefs({
+      showToasts: true,
+      autoAdvance: false,
+      defaultTimerSeconds: 0,
+      autoSpeakPrompt: false,
+      autoSpeakAnswer: false,
+      reminderEnabled: false,
+    });
     notify('Settings reset to defaults', 'success');
   };
 
-  // Wipe study progress (stats, activity, per-card SRS) while keeping content
+  // Wipe study progress (stats, activity, session history, per-card SRS)
+  // while keeping content
   const handleResetStatistics = useCallback(async () => {
     const resetCards = await resetStudyProgress();
     setCards(resetCards);
     setActivity([]);
+    setSessions([]);
     setStudyStats((prev) => ({
       ...prev,
       streakDays: 0,
@@ -668,6 +739,7 @@ export default function App() {
       putCards([withMiss]).catch(console.error);
       setStudyStats((prev) => applyStudyActivity(prev));
       bumpActivity({ reviews: 1 });
+      return withMiss;
     },
     [cards, bumpActivity]
   );
@@ -750,15 +822,45 @@ export default function App() {
     setQuizSetupOpen(false);
   }, []);
 
+  // Persist a completed session into history (state + IndexedDB)
+  const recordSession = useCallback(
+    (summary: SessionCompletionSummary | QuizSessionSummary) => {
+      const deckNameById = new Map(decks.map((d) => [d.id, d.name]));
+      const record: SessionRecord = {
+        id: createId('sess'),
+        mode: summary.mode,
+        deckIds: activeSession?.deckIds ?? [],
+        deckNames: (activeSession?.deckIds ?? []).map(
+          (id) => deckNameById.get(id) ?? 'Deck'
+        ),
+        total: summary.total,
+        correct: summary.correct,
+        durationMs: summary.durationMs,
+        completedAt: new Date().toISOString(),
+      };
+      addSessionRecord(record).catch(console.error);
+      setSessions((prev) => [record, ...prev].slice(0, 50));
+    },
+    [decks, activeSession]
+  );
+
   const handleQuizComplete = useCallback(
-    (bestStreak: number) => {
+    (summary: QuizSessionSummary) => {
       setStudyStats((prev) => ({
         ...prev,
-        bestQuizStreak: Math.max(prev.bestQuizStreak ?? 0, bestStreak),
+        bestQuizStreak: Math.max(prev.bestQuizStreak ?? 0, summary.bestStreak),
       }));
       bumpActivity({ quizzes: 1 });
+      recordSession(summary);
     },
-    [bumpActivity]
+    [bumpActivity, recordSession]
+  );
+
+  const handleFlashcardSessionComplete = useCallback(
+    (summary: SessionCompletionSummary) => {
+      recordSession(summary);
+    },
+    [recordSession]
   );
 
   // Launch a targeted quiz on the weakest words (Mistake Bank)
@@ -784,6 +886,148 @@ export default function App() {
   const handleDailyGoalChange = useCallback((goal: number) => {
     setStudyStats((prev) => ({ ...prev, dailyGoal: goal }));
   }, []);
+
+  // Leech Lab graduation: the passed card already includes the SRS outcome
+  // applied by the rating moments earlier, so persisting it whole is safe.
+  const handleGraduateLeech = useCallback(
+    (card: VocabCard) => {
+      if (!isLeechCard(card)) return;
+      const graduated = graduateLeechCard(card);
+      const cleared = !isLeechCard(graduated);
+      setCards((prev) => prev.map((c) => (c.id === card.id ? graduated : c)));
+      putCards([graduated]).catch(console.error);
+      if (cleared) {
+        notify(`"${card.word}" graduated from leech status`, 'success');
+      }
+    },
+    [notify]
+  );
+
+  // Launch the guided Leech Lab: flashcards over leech cards only
+  const handleStartLeechLab = useCallback(() => {
+    const leeches = languageCards.filter(isLeechCard);
+    if (leeches.length === 0) {
+      notify('No leech cards right now — nice work', 'info');
+      return;
+    }
+    setActiveSession({
+      mode: 'flashcards',
+      deckIds: Array.from(new Set(leeches.map((c) => c.deckId))),
+      direction: 'word-to-translation',
+      questionCount: leeches.length,
+      timerSeconds: 0,
+      leechFilter: 'only',
+      leechLab: true,
+    });
+  }, [languageCards, notify]);
+
+  // One-click "Review Now" from the due-today banner
+  const handleStartDueReview = useCallback(() => {
+    const due = languageCards.filter((c) => isCardDue(c));
+    if (due.length === 0) {
+      notify('Nothing due for review right now', 'info');
+      return;
+    }
+    setActiveSession({
+      mode: 'multiple-choice',
+      deckIds: Array.from(new Set(due.map((c) => c.deckId))),
+      direction: 'word-to-translation',
+      questionCount: Math.min(due.length, 20),
+      timerSeconds: 0,
+      dueOnly: true,
+      smartReviewOnly: true,
+      smartCardIds: due.map((c) => c.id),
+    });
+  }, [languageCards, notify]);
+
+  // Bulk card operations from the deck word list (multi-select)
+  const handleBulkDeleteCards = useCallback(
+    async (cardIds: string[]) => {
+      if (cardIds.length === 0) return;
+      const idSet = new Set(cardIds);
+      const removed = cards.filter((c) => idSet.has(c.id));
+      await deleteCardsByIds(cardIds);
+      setCards((prev) => prev.filter((c) => !idSet.has(c.id)));
+      if (activeSession?.smartCardIds?.some((id) => idSet.has(id))) {
+        setActiveSession(null);
+      }
+      notify(
+        `Deleted ${removed.length} ${removed.length === 1 ? 'word' : 'words'}`,
+        'info',
+        {
+          label: 'Undo',
+          onAction: () => {
+            void putCards(removed)
+              .then(() => {
+                setCards((prev) => [
+                  ...removed,
+                  ...prev.filter((c) => !removed.some((r) => r.id === c.id)),
+                ]);
+              })
+              .catch(console.error);
+          },
+        }
+      );
+    },
+    [cards, activeSession, notify]
+  );
+
+  const handleBulkUpdateCards = useCallback(
+    async (
+      cardIds: string[],
+      updates: { deckId?: string; difficulty?: DifficultyLevel }
+    ) => {
+      if (cardIds.length === 0) return;
+      const idSet = new Set(cardIds);
+      const targets = cards.filter((c) => idSet.has(c.id));
+      if (targets.length === 0) return;
+      const updated = targets.map((c) => ({ ...c, ...updates }));
+      const byId = new Map(updated.map((c) => [c.id, c]));
+      await putCards(updated);
+      setCards((prev) => prev.map((c) => byId.get(c.id) ?? c));
+
+      const movedTo = updates.deckId
+        ? decks.find((d) => d.id === updates.deckId)?.name
+        : undefined;
+      const what = movedTo
+        ? `moved to "${movedTo}"`
+        : updates.difficulty
+          ? `marked ${updates.difficulty}`
+          : 'updated';
+      notify(
+        `${updated.length} ${updated.length === 1 ? 'word' : 'words'} ${what}`,
+        'success',
+        {
+          label: 'Undo',
+          onAction: () => {
+            void putCards(targets)
+              .then(() => {
+                const origById = new Map(targets.map((c) => [c.id, c]));
+                setCards((prev) =>
+                  prev.map((c) => origById.get(c.id) ?? c)
+                );
+              })
+              .catch(console.error);
+          },
+        }
+      );
+    },
+    [cards, decks, notify]
+  );
+
+  const handleReminderEnabledChange = useCallback(
+    (enabled: boolean) => {
+      setAppPrefs((prev) => ({ ...prev, reminderEnabled: enabled }));
+      if (
+        enabled &&
+        typeof Notification !== 'undefined' &&
+        Notification.permission === 'default'
+      ) {
+        Notification.requestPermission().catch(() => {});
+      }
+    },
+    []
+  );
 
   // Full workspace backup / restore
   const handleExportAllBackup = useCallback(() => {
@@ -1213,6 +1457,34 @@ export default function App() {
             >
               {!activeSession && (
                 <div className="space-y-10">
+                  {showDueBanner && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <CalendarClock className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                        <p className="text-sm text-amber-900 dark:text-amber-200 truncate">
+                          <span className="font-semibold tabular-nums">{dueTodayCount}</span>{' '}
+                          {dueTodayCount === 1 ? 'card is' : 'cards are'} due for review today
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleStartDueReview}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-colors"
+                        >
+                          Review Now
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDueBannerDismissedFor(getLocalDateString())}
+                          aria-label="Dismiss due review reminder"
+                          className="p-1.5 rounded-lg text-amber-700/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <OverviewStrip
                     languageId={activeLanguage.id}
                     decks={languageDecks}
@@ -1227,6 +1499,8 @@ export default function App() {
                     cards={languageCards}
                     deckNameFor={deckNameFor}
                     onPracticeMistakes={handlePracticeMistakes}
+                    sessions={sessions}
+                    onStartLeechLab={handleStartLeechLab}
                   />
                   <ErrorBoundary>
                     <DeckWorkspace
@@ -1245,6 +1519,8 @@ export default function App() {
                       onBulkAddCards={handleBulkAddCards}
                       onUpdateCard={handleUpdateCard}
                       onDeleteCard={handleDeleteCard}
+                      onBulkDeleteCards={handleBulkDeleteCards}
+                      onBulkUpdateCards={handleBulkUpdateCards}
                       onImportDeckJson={handleImportDeckJson}
                       onPracticeDeck={(deckId) => openQuizSetup(deckId)}
                       onNotify={notify}
@@ -1268,6 +1544,10 @@ export default function App() {
                     ttsMuted={ttsMuted}
                     langCode={activeLanguage.code}
                     voice={activeVoice}
+                    autoSpeakPrompt={appPrefs.autoSpeakPrompt}
+                    autoSpeakAnswer={appPrefs.autoSpeakAnswer}
+                    onSessionComplete={handleFlashcardSessionComplete}
+                    onGraduateLeech={handleGraduateLeech}
                   />
                 </ErrorBoundary>
               )}
@@ -1289,6 +1569,8 @@ export default function App() {
                     ttsMuted={ttsMuted}
                     voice={activeVoice}
                     autoAdvance={appPrefs.autoAdvance}
+                    autoSpeakPrompt={appPrefs.autoSpeakPrompt}
+                    autoSpeakAnswer={appPrefs.autoSpeakAnswer}
                   />
                 </ErrorBoundary>
               )}
@@ -1337,6 +1619,16 @@ export default function App() {
         }
         onResetDefaults={handleResetSettings}
         onResetStatistics={handleResetStatistics}
+        autoSpeakPrompt={appPrefs.autoSpeakPrompt}
+        onAutoSpeakPromptChange={(enabled) =>
+          setAppPrefs((prev) => ({ ...prev, autoSpeakPrompt: enabled }))
+        }
+        autoSpeakAnswer={appPrefs.autoSpeakAnswer}
+        onAutoSpeakAnswerChange={(enabled) =>
+          setAppPrefs((prev) => ({ ...prev, autoSpeakAnswer: enabled }))
+        }
+        reminderEnabled={appPrefs.reminderEnabled}
+        onReminderChange={handleReminderEnabledChange}
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

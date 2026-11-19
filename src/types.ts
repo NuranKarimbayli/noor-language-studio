@@ -83,6 +83,9 @@ export interface SessionConfig {
   // Leech-card filter: 'exclude' drops repeatedly-missed cards from the pool,
   // 'only' restricts the session to leech cards for targeted review.
   leechFilter?: 'all' | 'exclude' | 'only';
+  // Guided Leech Lab remediation: consecutive non-hard ratings on a leech card
+  // gradually clear its lapse/wrong counters until it graduates.
+  leechLab?: boolean;
 }
 
 export interface QuizQuestion {
@@ -124,6 +127,33 @@ export interface AppPrefs {
   showToasts: boolean; // show non-critical toast notifications (default true)
   autoAdvance: boolean; // auto-advance to the next quiz question after answering
   defaultTimerSeconds: number; // quiz setup default timer, 0 = off
+  autoSpeakPrompt: boolean; // speak the target word when a card/question appears
+  autoSpeakAnswer: boolean; // speak the word/example again when the answer is revealed
+  reminderEnabled: boolean; // browser Notification when reviews are due
+}
+
+// Completed study session persisted in IndexedDB (session history)
+export interface SessionRecord {
+  id: string;
+  mode: SessionMode;
+  deckIds: string[];
+  deckNames: string[]; // snapshot for display even if decks are later renamed
+  total: number; // cards/questions attempted
+  correct: number;
+  durationMs: number;
+  completedAt: string; // ISO timestamp
+}
+
+// Summary passed up by study components when a session completes
+export interface SessionCompletionSummary {
+  mode: SessionMode;
+  total: number;
+  correct: number;
+  durationMs: number;
+}
+
+export interface QuizSessionSummary extends SessionCompletionSummary {
+  bestStreak: number;
 }
 
 // Daily activity record persisted in IndexedDB, keyed by YYYY-MM-DD

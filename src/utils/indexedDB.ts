@@ -5,6 +5,7 @@ import {
   ConfidenceLevel,
   Deck,
   LanguageItem,
+  SessionRecord,
   StudyStats,
   ThemeMode,
   VocabCard,
@@ -46,6 +47,10 @@ interface NoorStudioDB extends DBSchema {
     key: string;
     value: ActivityDay;
   };
+  sessions: {
+    key: string;
+    value: SessionRecord;
+  };
   meta: {
     key: string;
     value: unknown;
@@ -53,7 +58,7 @@ interface NoorStudioDB extends DBSchema {
 }
 
 const DB_NAME = 'noor-studio-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const SEED_COMPLETED_KEY = 'seed-completed';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
@@ -95,6 +100,10 @@ function getDB(): Promise<IDBPDatabase<NoorStudioDB>> {
         }
         if (!db.objectStoreNames.contains('activity')) {
           db.createObjectStore('activity', { keyPath: 'date' });
+        }
+        // v5: completed-session history for accuracy trends
+        if (!db.objectStoreNames.contains('sessions')) {
+          db.createObjectStore('sessions', { keyPath: 'id' });
         }
       },
     }).catch((error) => {
@@ -402,6 +411,10 @@ export async function deleteCardsByDecks(deckIds: string[]): Promise<void> {
   await Promise.all(deckIds.map((deckId) => deleteCardsByDeck(deckId)));
 }
 
+export async function deleteCardsByIds(cardIds: string[]): Promise<void> {
+  await Promise.all(cardIds.map((id) => deleteCard(id)));
+}
+
 // Stats operations
 export async function getStats(): Promise<StudyStats> {
   const db = await getDB();
@@ -490,6 +503,9 @@ export async function getAppPrefs(): Promise<AppPrefs> {
       typeof timer === 'number' && Number.isFinite(timer) && timer >= 0
         ? timer
         : 0,
+    autoSpeakPrompt: stored?.autoSpeakPrompt === true,
+    autoSpeakAnswer: stored?.autoSpeakAnswer === true,
+    reminderEnabled: stored?.reminderEnabled === true,
   };
 }
 
@@ -509,12 +525,38 @@ export async function putActivityDay(day: ActivityDay): Promise<void> {
   await db.put('activity', day);
 }
 
+// Completed-session history (accuracy trends). Capped so the store can't grow
+// unbounded — oldest records are pruned beyond MAX_SESSION_RECORDS.
+const MAX_SESSION_RECORDS = 200;
+
+export async function getSessionHistory(limit = 50): Promise<SessionRecord[]> {
+  const db = await getDB();
+  const all = await db.getAll('sessions');
+  return all
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+    .slice(0, limit);
+}
+
+export async function addSessionRecord(record: SessionRecord): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('sessions', 'readwrite');
+  await tx.store.put(record);
+  const all = await tx.store.getAll();
+  if (all.length > MAX_SESSION_RECORDS) {
+    const oldest = all
+      .sort((a, b) => a.completedAt.localeCompare(b.completedAt))
+      .slice(0, all.length - MAX_SESSION_RECORDS);
+    await Promise.all(oldest.map((r) => tx.store.delete(r.id)));
+  }
+  await tx.done;
+}
+
 /**
  * Clear all data (for testing or reset)
  */
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'meta'], 'readwrite');
+  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'meta'], 'readwrite');
   await Promise.all([
     tx.objectStore('languages').clear(),
     tx.objectStore('decks').clear(),
@@ -524,6 +566,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('sfxMuted').clear(),
     tx.objectStore('ttsMuted').clear(),
     tx.objectStore('activity').clear(),
+    tx.objectStore('sessions').clear(),
     tx.objectStore('meta').clear(),
   ]);
   await tx.done;
@@ -562,7 +605,7 @@ export async function resetStudyProgress(): Promise<VocabCard[]> {
     return { ...rest, confidence: 'new' as const, reviewCount: 0 };
   });
 
-  const tx = db.transaction(['cards', 'stats', 'activity'], 'readwrite');
+  const tx = db.transaction(['cards', 'stats', 'activity', 'sessions'], 'readwrite');
   const cardsStore = tx.objectStore('cards');
   for (const card of resetCards) {
     cardsStore.put(card);
@@ -570,6 +613,7 @@ export async function resetStudyProgress(): Promise<VocabCard[]> {
   await Promise.all([
     tx.objectStore('stats').clear(),
     tx.objectStore('activity').clear(),
+    tx.objectStore('sessions').clear(),
     tx.done,
   ]);
   return resetCards;

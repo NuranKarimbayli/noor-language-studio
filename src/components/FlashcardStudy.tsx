@@ -13,6 +13,7 @@ import {
 import {
   ConfidenceLevel,
   Deck,
+  SessionCompletionSummary,
   SessionConfig,
   VocabCard,
 } from '../types';
@@ -25,19 +26,32 @@ import {
 } from '../utils/soundEffects';
 import { CelebrationBurst } from './CelebrationBurst';
 import { SpeakButton } from './SpeakButton';
-import { stopSpeaking, VoiceSelection } from '../utils/speechUtils';
+import {
+  isVoiceSupported,
+  speakText,
+  stopSpeaking,
+  useBrowserVoices,
+  VoiceSelection,
+} from '../utils/speechUtils';
 
 interface FlashcardStudyProps {
   decks: Deck[];
   cards: VocabCard[];
   sessionConfig: SessionConfig;
   sfxMuted: boolean;
-  onRateCard: (cardId: string, confidence: ConfidenceLevel) => void;
+  onRateCard: (
+    cardId: string,
+    confidence: ConfidenceLevel
+  ) => VocabCard | undefined;
   onOpenSetup: () => void;
   onBackToWorkspace: () => void;
   ttsMuted?: boolean;
   langCode?: string;
   voice?: VoiceSelection | null;
+  autoSpeakPrompt?: boolean;
+  autoSpeakAnswer?: boolean;
+  onSessionComplete?: (summary: SessionCompletionSummary) => void;
+  onGraduateLeech?: (card: VocabCard) => void;
 }
 
 type QueueOrder = 'smart' | 'sequential' | 'shuffled';
@@ -68,6 +82,10 @@ export function FlashcardStudy({
   ttsMuted = false,
   langCode = 'EN',
   voice,
+  autoSpeakPrompt = false,
+  autoSpeakAnswer = false,
+  onSessionComplete,
+  onGraduateLeech,
 }: FlashcardStudyProps) {
   const [queueOrder, setQueueOrder] = useState<QueueOrder>('smart');
   const [onlyHardMode, setOnlyHardMode] = useState(false);
@@ -81,6 +99,10 @@ export function FlashcardStudy({
 
   const advanceLockRef = useRef(false);
   const rateTimeoutRef = useRef<number | null>(null);
+  const sessionStartRef = useRef<number>(performance.now());
+  const completionReportedRef = useRef(false);
+  // Leech Lab: consecutive non-hard ratings per card id
+  const leechStreakRef = useRef<Map<string, number>>(new Map());
 
   const deckMap = useMemo(() => {
     const map = new Map<string, Deck>();
@@ -97,6 +119,9 @@ export function FlashcardStudy({
     setSessionRatings({ hard: 0, good: 0, easy: 0 });
     setRatingPulse(null);
     setSessionSeed((s) => s + 1);
+    sessionStartRef.current = performance.now();
+    completionReportedRef.current = false;
+    leechStreakRef.current = new Map();
   }, [sessionConfig]);
 
   const studyQueue: StudyItem[] = useMemo(() => {
@@ -166,6 +191,9 @@ export function FlashcardStudy({
     setSessionRatings({ hard: 0, good: 0, easy: 0 });
     setRatingPulse(null);
     setSessionSeed((s) => s + 1);
+    sessionStartRef.current = performance.now();
+    completionReportedRef.current = false;
+    leechStreakRef.current = new Map();
   }, [cancelPendingAdvance]);
 
   const handleOrderChange = (nextOrder: QueueOrder) => {
@@ -200,8 +228,27 @@ export function FlashcardStudy({
         playCorrectSound(sfxMuted);
       }
 
-      onRateCard(currentItem.card.id, level);
+      const ratedCard = onRateCard(currentItem.card.id, level);
       setSessionRatings((prev) => ({ ...prev, [level]: prev[level] + 1 }));
+
+      // Leech Lab: two consecutive non-hard ratings graduate the card. The
+      // card returned by onRateCard already carries the fresh SRS outcome.
+      if (sessionConfig.leechLab) {
+        const gradBase = ratedCard ?? liveCard ?? currentItem.card;
+        if (isLeechCard(gradBase)) {
+          if (level === 'hard') {
+            leechStreakRef.current.set(gradBase.id, 0);
+          } else {
+            const streak = (leechStreakRef.current.get(gradBase.id) ?? 0) + 1;
+            leechStreakRef.current.set(gradBase.id, streak);
+            if (streak >= 2) {
+              leechStreakRef.current.delete(gradBase.id);
+              onGraduateLeech?.(gradBase);
+            }
+          }
+        }
+      }
+
       setIsFlipped(false);
 
       if (rateTimeoutRef.current !== null) {
@@ -221,7 +268,7 @@ export function FlashcardStudy({
         rateTimeoutRef.current = null;
       }, 220);
     },
-    [currentItem, isFlipped, onRateCard, currentIndex, studyQueue.length, sfxMuted]
+    [currentItem, liveCard, isFlipped, onRateCard, onGraduateLeech, sessionConfig.leechLab, currentIndex, studyQueue.length, sfxMuted]
   );
 
   useEffect(() => {
@@ -278,6 +325,72 @@ export function FlashcardStudy({
   useEffect(() => {
     stopSpeaking();
   }, [currentIndex]);
+
+  // Voice support for auto-speak
+  const browserVoices = useBrowserVoices();
+  const voiceSupported = isVoiceSupported(langCode, voice, browserVoices);
+
+  // Auto-speak the prompt word when a new card appears
+  useEffect(() => {
+    if (
+      sessionComplete ||
+      !autoSpeakPrompt ||
+      ttsMuted ||
+      !voiceSupported ||
+      !currentItem
+    ) {
+      return;
+    }
+    speakText(currentItem.card.word, langCode, voice);
+  }, [
+    currentIndex,
+    sessionComplete,
+    autoSpeakPrompt,
+    ttsMuted,
+    voiceSupported,
+    currentItem,
+    langCode,
+    voice,
+  ]);
+
+  // Auto-speak the answer context when the card flips: example sentence when
+  // present, otherwise the target word again.
+  useEffect(() => {
+    if (!isFlipped || !autoSpeakAnswer || ttsMuted || !voiceSupported || !currentItem) {
+      return;
+    }
+    const text = currentItem.card.exampleSentence ?? currentItem.card.word;
+    speakText(text, langCode, voice);
+  }, [
+    isFlipped,
+    autoSpeakAnswer,
+    ttsMuted,
+    voiceSupported,
+    currentItem,
+    langCode,
+    voice,
+  ]);
+
+  // Report session completion exactly once per finished session
+  useEffect(() => {
+    if (!sessionComplete || completionReportedRef.current) return;
+    completionReportedRef.current = true;
+    onSessionComplete?.({
+      mode: 'flashcards',
+      total: studyQueue.length,
+      correct: sessionRatings.good + sessionRatings.easy,
+      durationMs: Math.max(0, performance.now() - sessionStartRef.current),
+    });
+  }, [sessionComplete, studyQueue.length, sessionRatings, onSessionComplete]);
+
+  // Leech Lab: how many session cards are still leech after live updates
+  const remainingLeeches = useMemo(() => {
+    if (!sessionConfig.leechLab) return 0;
+    return studyQueue.filter((item) => {
+      const live = cards.find((c) => c.id === item.card.id) ?? item.card;
+      return isLeechCard(live);
+    }).length;
+  }, [sessionConfig.leechLab, studyQueue, cards]);
 
   const progressPct =
     studyQueue.length > 0 ? Math.round(((currentIndex + 1) / studyQueue.length) * 100) : 0;
@@ -394,6 +507,13 @@ export function FlashcardStudy({
             <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">
               You reviewed {studyQueue.length} {studyQueue.length === 1 ? 'card' : 'cards'} and updated your Leitner spacing schedule.
             </p>
+            {sessionConfig.leechLab && (
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                {remainingLeeches === 0
+                  ? 'All leech cards in this session graduated — great work.'
+                  : `${remainingLeeches} ${remainingLeeches === 1 ? 'leech card' : 'leech cards'} still need${remainingLeeches === 1 ? 's' : ''} work. Run Leech Lab again to continue.`}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-4 max-w-md mx-auto pt-2 pb-2 border-y border-slate-200 dark:border-[#2E2A25] tabular-nums relative z-10">

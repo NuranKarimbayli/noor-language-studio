@@ -163,6 +163,19 @@ export function isLeechCard(card: VocabCard): boolean {
   );
 }
 
+/**
+ * Leech Lab graduation: clears the lapse counter and discounts the wrong
+ * count by one threshold worth, so a card that keeps failing needs several
+ * successful remediation rounds before its leech badge disappears for good.
+ */
+export function graduateLeechCard(card: VocabCard): VocabCard {
+  return {
+    ...card,
+    lapses: 0,
+    wrongCount: Math.max(0, (card.wrongCount ?? 0) - LEECH_WRONG_THRESHOLD),
+  };
+}
+
 export interface DeckMastery {
   total: number;
   mastered: number;
