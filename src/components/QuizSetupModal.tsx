@@ -8,6 +8,7 @@ import {
   Headphones,
   Keyboard,
   ListChecks,
+  Mic,
   Play,
   TextCursorInput,
   X,
@@ -23,7 +24,7 @@ import { Modal } from './Modal';
 import { createBlankedSentence } from '../utils/textUtils';
 import { getCardDifficulty } from '../utils/storage';
 import { isCardDue, isLeechCard } from '../utils/srs';
-import { isVoiceSupported, useBrowserVoices, VoiceSelection } from '../utils/speechUtils';
+import { isSpeechRecognitionSupported, isVoiceSupported, useBrowserVoices, VoiceSelection } from '../utils/speechUtils';
 
 interface QuizSetupModalProps {
   open: boolean;
@@ -87,6 +88,12 @@ const MODE_OPTIONS: Array<{
     desc: 'Complete missing words inside example sentences.',
     icon: TextCursorInput,
   },
+  {
+    id: 'speaking',
+    title: 'Speaking Practice',
+    desc: 'Hear the meaning, then say the word aloud. Chrome/Edge only.',
+    icon: Mic,
+  },
 ];
 
 export function QuizSetupModal({
@@ -114,6 +121,7 @@ export function QuizSetupModal({
 
   const browserVoices = useBrowserVoices();
   const voiceSupported = isVoiceSupported(languageCode, voice, browserVoices);
+  const recognitionSupported = isSpeechRecognitionSupported();
 
   // Listening quiz is impossible without a native voice — fall back safely
   useEffect(() => {
@@ -121,6 +129,13 @@ export function QuizSetupModal({
       setMode('multiple-choice');
     }
   }, [open, mode, voiceSupported]);
+
+  // Speaking practice needs the Web Speech recognition API
+  useEffect(() => {
+    if (open && mode === 'speaking' && !recognitionSupported) {
+      setMode('multiple-choice');
+    }
+  }, [open, mode, recognitionSupported]);
 
   // Sync defaults whenever the modal opens
   useEffect(() => {
@@ -215,6 +230,25 @@ export function QuizSetupModal({
   const effectiveCount =
     maxEligibleCount === 0 ? 0 : Math.min(questionCount, maxEligibleCount);
 
+  // Rough duration estimate for session planning
+  const estimatedLabel = useMemo(() => {
+    if (effectiveCount === 0) return null;
+    const perItem =
+      mode === 'flashcards'
+        ? 12
+        : mode === 'speaking'
+          ? 10
+          : timerSeconds > 0
+            ? timerSeconds + 4
+            : mode === 'typing' || mode === 'fill-blank'
+              ? 14
+              : 8;
+    const total = effectiveCount * perItem;
+    return total >= 90
+      ? `~${Math.round(total / 60)} min`
+      : `~${Math.round(total / 5) * 5}s`;
+  }, [effectiveCount, mode, timerSeconds]);
+
   const handleLaunch = () => {
     if (effectiveCount === 0) return;
     onStartSession({
@@ -267,17 +301,21 @@ export function QuizSetupModal({
             {MODE_OPTIONS.map((opt) => {
               const Icon = opt.icon;
               const active = mode === opt.id;
-              const optionDisabled = opt.id === 'listening' && !voiceSupported;
+              const optionDisabled =
+                (opt.id === 'listening' && !voiceSupported) ||
+                (opt.id === 'speaking' && !recognitionSupported);
+              const disabledHint =
+                opt.id === 'listening' && !voiceSupported
+                  ? 'Listening quiz requires a supported browser voice for this language.'
+                  : opt.id === 'speaking' && !recognitionSupported
+                    ? 'Speaking practice requires Chrome or Edge (speech recognition).'
+                    : undefined;
               return (
                 <button
                   key={opt.id}
                   type="button"
                   disabled={optionDisabled}
-                  title={
-                    optionDisabled
-                      ? 'Listening quiz requires a supported browser voice for this language.'
-                      : undefined
-                  }
+                  title={disabledHint}
                   onClick={() => setMode(opt.id)}
                   className={`text-left p-3.5 rounded-xl border transition-all flex flex-col gap-2 ${
                     optionDisabled ? 'opacity-50 cursor-not-allowed' : ''
@@ -316,6 +354,13 @@ export function QuizSetupModal({
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               Listening quiz requires a supported browser voice for this
               language. Speaker buttons are disabled for {languageName}.
+            </p>
+          )}
+          {!recognitionSupported && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              Speaking Practice is unavailable — it needs Chrome or Edge with
+              microphone speech recognition.
             </p>
           )}
         </div>
@@ -447,6 +492,11 @@ export function QuizSetupModal({
                 </span>
                 <span className="font-mono font-semibold text-[#B45309] dark:text-[#F59E0B] tabular-nums">
                   {effectiveCount} / {maxEligibleCount}
+                  {estimatedLabel && (
+                    <span className="ml-1.5 text-[11px] font-medium text-[#78716C] dark:text-[#A8A29E]">
+                      {estimatedLabel}
+                    </span>
+                  )}
                 </span>
               </div>
               <input

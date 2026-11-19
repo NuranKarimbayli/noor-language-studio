@@ -31,6 +31,28 @@ export function parseBulkLines(raw: string): BulkParseResult {
     let mainPart = trimmed;
     let exampleSentence: string | undefined;
 
+    // Quoted CSV row (e.g. "word","translation","example") — split on ","
+    // boundaries so commas inside fields are preserved.
+    if (trimmed.startsWith('"')) {
+      const fields = trimmed
+        .replace(/^"|"$/g, '')
+        .split('","')
+        .map((f) => f.replace(/""/g, '"').trim());
+      if (fields.length >= 2 && fields[0] && fields[1]) {
+        if (!/^word$/i.test(fields[0]) || !/^translation$/i.test(fields[1])) {
+          items.push({
+            word: fields[0],
+            translation: fields[1],
+            exampleSentence: fields[2] || undefined,
+          });
+        }
+        return;
+      }
+    }
+
+    // Skip a bare header row like "word,translation,example"
+    if (/^word\s*,\s*translation/i.test(trimmed)) return;
+
     const pipeIndex = trimmed.indexOf('|');
     if (pipeIndex !== -1) {
       mainPart = trimmed.slice(0, pipeIndex).trim();
@@ -38,16 +60,19 @@ export function parseBulkLines(raw: string): BulkParseResult {
       if (ex) exampleSentence = ex;
     }
 
-    const separators = [' -> ', ' — ', ' – ', ' - ', '\t', ';', '='];
+    const separators = [' -> ', ' — ', ' – ', ' - ', '\t', ';', '=', ','];
     let word = '';
     let translation = '';
     let matched = false;
 
+    const unquote = (s: string) =>
+      s.length > 1 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1).replace(/""/g, '"') : s;
+
     for (const sep of separators) {
       const idx = mainPart.indexOf(sep);
       if (idx > 0) {
-        word = mainPart.slice(0, idx).trim();
-        translation = mainPart.slice(idx + sep.length).trim();
+        word = unquote(mainPart.slice(0, idx).trim());
+        translation = unquote(mainPart.slice(idx + sep.length).trim());
         if (word && translation) {
           matched = true;
           break;

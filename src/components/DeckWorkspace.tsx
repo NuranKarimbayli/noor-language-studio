@@ -3,18 +3,22 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
   BookOpen,
+  FileDown,
   FileUp,
   ListPlus,
   MoreHorizontal,
   Pencil,
+  Play,
   Plus,
   Search,
   Trash2,
+  Upload,
   X,
+  Zap,
 } from 'lucide-react';
-import { ConfidenceLevel, Deck, DifficultyLevel, VocabCard } from '../types';
-import { exportDeckAsJson, findDuplicateCard, getCardDifficulty, parseImportedDeckJson } from '../utils/storage';
-import { getDeckMastery, isCardDue, isLeechCard } from '../utils/srs';
+import { ConfidenceLevel, Deck, DifficultyLevel, SmartDeck, SmartDeckFilter, VocabCard } from '../types';
+import { exportDeckAsCsv, exportDeckAsJson, findDuplicateCard, getCardDifficulty, parseImportedDeckJson } from '../utils/storage';
+import { getDeckMastery, getSmartDeckCards, isCardDue, isLeechCard, matchesSmartFilter } from '../utils/srs';
 import { parseBulkLines } from '../utils/textUtils';
 import { DiacriticBar } from './DiacriticBar';
 import { Modal } from './Modal';
@@ -79,6 +83,14 @@ interface DeckWorkspaceProps {
     }>;
   }) => Promise<void>;
   onPracticeDeck: (deckId: string) => void;
+  smartDecks: SmartDeck[];
+  onCreateSmartDeck: (data: {
+    name: string;
+    description?: string;
+    filter: SmartDeckFilter;
+  }) => Promise<void>;
+  onDeleteSmartDeck: (smartDeckId: string) => Promise<void>;
+  onStudySmartDeck: (smartDeck: SmartDeck) => void;
   onNotify: (text: string, variant?: 'success' | 'info' | 'error') => void;
   ttsMuted?: boolean;
   voice?: VoiceSelection | null;
@@ -91,7 +103,9 @@ type ModalState =
   | { type: 'delete-deck'; deck: Deck }
   | { type: 'add-words'; tab: 'single' | 'bulk' }
   | { type: 'edit-card'; card: VocabCard }
-  | { type: 'json-import' };
+  | { type: 'json-import' }
+  | { type: 'create-smart-deck' }
+  | { type: 'delete-smart-deck'; smartDeck: SmartDeck };
 
 const CONFIDENCE_FILTERS: Array<{ value: 'all' | ConfidenceLevel; label: string }> = [
   { value: 'all', label: 'All' },
@@ -100,6 +114,19 @@ const CONFIDENCE_FILTERS: Array<{ value: 'all' | ConfidenceLevel; label: string 
   { value: 'good', label: 'Good' },
   { value: 'easy', label: 'Easy' },
 ];
+
+const SMART_FILTER_OPTIONS: Array<{ key: keyof SmartDeckFilter; label: string; hint: string }> = [
+  { key: 'weak', label: 'Weak words', hint: 'Hard-rated or low Leitner box' },
+  { key: 'due', label: 'Due for review', hint: 'Scheduled review is due now' },
+  { key: 'leeches', label: 'Leeches', hint: 'Repeatedly missed cards' },
+  { key: 'newOnly', label: 'New cards', hint: 'Never reviewed yet' },
+  { key: 'hardOnly', label: 'Hard-rated', hint: 'Self-rated Hard' },
+];
+
+function smartFilterSummary(filter: SmartDeckFilter): string {
+  const parts = SMART_FILTER_OPTIONS.filter((o) => filter[o.key]).map((o) => o.label.toLowerCase());
+  return parts.length > 0 ? parts.join(' + ') : 'no filters';
+}
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyLevel; label: string }> = [
   { value: 'easy', label: 'Easy' },
@@ -127,6 +154,10 @@ export function DeckWorkspace({
   onBulkUpdateCards,
   onImportDeckJson,
   onPracticeDeck,
+  smartDecks,
+  onCreateSmartDeck,
+  onDeleteSmartDeck,
+  onStudySmartDeck,
   onNotify,
   ttsMuted = false,
   voice,
@@ -153,6 +184,13 @@ export function DeckWorkspace({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
   const [bulkMoveDeckId, setBulkMoveDeckId] = useState('');
+
+  // Smart deck selection + creation state
+  const [selectedSmartDeckId, setSelectedSmartDeckId] = useState<string | null>(null);
+  const [smartDeckName, setSmartDeckName] = useState('');
+  const [smartDeckDesc, setSmartDeckDesc] = useState('');
+  const [smartDeckFilter, setSmartDeckFilter] = useState<SmartDeckFilter>({});
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
   // Deck form state
   const [deckName, setDeckName] = useState('');
@@ -203,6 +241,40 @@ export function DeckWorkspace({
     return cards.filter((c) => c.deckId === selectedDeck.id);
   }, [cards, selectedDeck]);
 
+  // Smart decks compute membership live from card SRS state
+  const activeSmartDeck = useMemo(
+    () => smartDecks.find((s) => s.id === selectedSmartDeckId) ?? null,
+    [smartDecks, selectedSmartDeckId]
+  );
+
+  const smartDeckCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const sd of smartDecks) {
+      counts.set(
+        sd.id,
+        cards.reduce((n, c) => n + (matchesSmartFilter(c, sd.filter) ? 1 : 0), 0)
+      );
+    }
+    return counts;
+  }, [smartDecks, cards]);
+
+  const smartPreviewCount = useMemo(
+    () =>
+      cards.reduce(
+        (n, c) => n + (matchesSmartFilter(c, smartDeckFilter) ? 1 : 0),
+        0
+      ),
+    [cards, smartDeckFilter]
+  );
+
+  const viewCards = useMemo(
+    () =>
+      activeSmartDeck
+        ? getSmartDeckCards(cards, activeSmartDeck.filter)
+        : deckCards,
+    [activeSmartDeck, cards, deckCards]
+  );
+
   // Single pass over cards to avoid O(decks × cards) filtering on every render
   const cardCountsByDeck = useMemo(() => {
     const counts = new Map<string, number>();
@@ -244,19 +316,19 @@ export function DeckWorkspace({
     : undefined;
 
   const stats = useMemo(() => {
-    const counts = { total: deckCards.length, new: 0, hard: 0, good: 0, easy: 0 };
-    for (const c of deckCards) {
+    const counts = { total: viewCards.length, new: 0, hard: 0, good: 0, easy: 0 };
+    for (const c of viewCards) {
       counts[c.confidence] += 1;
     }
     return counts;
-  }, [deckCards]);
+  }, [viewCards]);
 
   // Deferred value keeps the list responsive while a large filter recomputes
   const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
 
   const filteredCards = useMemo(() => {
     const q = deferredSearchQuery.trim().toLowerCase();
-    return deckCards.filter((card) => {
+    return viewCards.filter((card) => {
       if (confidenceFilter !== 'all' && card.confidence !== confidenceFilter) {
         return false;
       }
@@ -267,7 +339,7 @@ export function DeckWorkspace({
         (card.exampleSentence && card.exampleSentence.toLowerCase().includes(q))
       );
     });
-  }, [deckCards, deferredSearchQuery, confidenceFilter]);
+  }, [viewCards, deferredSearchQuery, confidenceFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredCards.length / ITEMS_PER_PAGE) || 1;
@@ -288,11 +360,12 @@ export function DeckWorkspace({
 
   const bulkParsed = useMemo(() => parseBulkLines(bulkText), [bulkText]);
 
-  // Bulk selection helpers — selection is scoped to the current deck
+  // Bulk selection helpers — selection is scoped to the current view
   useEffect(() => {
     setSelectedCardIds(new Set());
     setBulkMoveDeckId('');
-  }, [selectedDeckId]);
+    setSelectionMode(false);
+  }, [selectedDeckId, selectedSmartDeckId]);
 
   const toggleCardSelection = useCallback((cardId: string) => {
     setSelectedCardIds((prev) => {
@@ -580,6 +653,61 @@ export function DeckWorkspace({
     }
   };
 
+  const handleSelectDeckCard = (deckId: string) => {
+    setSelectedSmartDeckId(null);
+    onSelectDeck(deckId);
+  };
+
+  const openCreateSmartDeck = () => {
+    setSmartDeckName('');
+    setSmartDeckDesc('');
+    setSmartDeckFilter({});
+    setModal({ type: 'create-smart-deck' });
+  };
+
+  const handleSmartDeckSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = smartDeckName.trim();
+    if (!name) return;
+    const hasFilter = SMART_FILTER_OPTIONS.some((o) => smartDeckFilter[o.key]);
+    if (!hasFilter) {
+      onNotify('Pick at least one filter for the smart deck.', 'error');
+      return;
+    }
+    try {
+      await onCreateSmartDeck({
+        name,
+        description: smartDeckDesc.trim() || undefined,
+        filter: smartDeckFilter,
+      });
+      setModal({ type: 'none' });
+    } catch {
+      onNotify('Could not create the smart deck. Please try again.', 'error');
+    }
+  };
+
+  const handleBulkFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      if (!text.trim()) {
+        onNotify('That file appears to be empty.', 'error');
+        return;
+      }
+      setBulkText(text);
+      const parsed = parseBulkLines(text);
+      onNotify(
+        `Loaded ${file.name} — ${parsed.items.length} entries detected.`,
+        'success'
+      );
+    };
+    reader.onerror = () => onNotify('Could not read that file.', 'error');
+    reader.readAsText(file);
+  };
+
   const renderDifficultyPicker = (
     value: DifficultyLevel,
     onChange: (next: DifficultyLevel) => void
@@ -633,7 +761,7 @@ export function DeckWorkspace({
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium text-[#57534E] dark:text-[#A8A29E]">
-            {languageName} Decks ({decks.length})
+            {languageName} Decks ({decks.length + smartDecks.length})
           </h2>
           <div className="flex items-center gap-3">
             <button
@@ -642,6 +770,14 @@ export function DeckWorkspace({
               className="text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
             >
               Import JSON
+            </button>
+            <button
+              type="button"
+              onClick={openCreateSmartDeck}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#78716C] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Smart Deck
             </button>
             <button
               type="button"
@@ -654,7 +790,7 @@ export function DeckWorkspace({
           </div>
         </div>
 
-        {decks.length === 0 ? (
+        {decks.length === 0 && smartDecks.length === 0 ? (
           <div className="py-16 px-6 text-center bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl">
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] mb-2">
               No {languageName} decks yet
@@ -683,6 +819,50 @@ export function DeckWorkspace({
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {smartDecks.map((sd) => {
+              const count = smartDeckCounts.get(sd.id) ?? 0;
+              const active = selectedSmartDeckId === sd.id;
+              return (
+                <div
+                  key={sd.id}
+                  onClick={() => setSelectedSmartDeckId(sd.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedSmartDeckId(sd.id);
+                    }
+                  }}
+                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all ${
+                    active
+                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-xs'
+                      : 'bg-[#FBF7F0]/70 dark:bg-[#1A1714] border-slate-200 dark:border-[#2E2A25] hover:border-[#D97706]/60 dark:hover:border-[#D97706]/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Zap className="w-3.5 h-3.5 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
+                      <h3 className="font-medium text-sm sm:text-base text-[#1C1917] dark:text-[#F5F2EC] leading-snug truncate">
+                        {sd.name}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] text-[10px] font-semibold uppercase tracking-wide">
+                      Smart
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
+                    {smartFilterSummary(sd.filter)}
+                    {sd.description ? ` · ${sd.description}` : ''}
+                  </p>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                    <span>
+                      {count} {count === 1 ? 'word' : 'words'} now
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             {decks.map((deck) => {
               const count = cardCountsByDeck.get(deck.id) ?? 0;
               const dueCount = dueCountByDeck.get(deck.id) ?? 0;
@@ -693,13 +873,13 @@ export function DeckWorkspace({
               return (
                 <div
                   key={deck.id}
-                  onClick={() => onSelectDeck(deck.id)}
+                  onClick={() => handleSelectDeckCard(deck.id)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      onSelectDeck(deck.id);
+                      handleSelectDeckCard(deck.id);
                     }
                   }}
                   className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all ${
@@ -781,6 +961,19 @@ export function DeckWorkspace({
                             type="button"
                             onClick={() => {
                               setOpenDeckMenuId(null);
+                              const dCards = cards.filter((c) => c.deckId === deck.id);
+                              exportDeckAsCsv(deck, dCards);
+                              onNotify(`Exported "${deck.name}" as CSV`, 'success');
+                            }}
+                            className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                          >
+                            <FileDown className="w-3.5 h-3.5 text-[#78716C]" />
+                            Export CSV
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenDeckMenuId(null);
                               setModal({ type: 'delete-deck', deck });
                             }}
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
@@ -823,10 +1016,61 @@ export function DeckWorkspace({
       {selectedDeck && (
         <section className="space-y-5">
           {/* Calm Deck Title & Overflow Menu */}
+          {activeSmartDeck ? (
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#2E2A25]">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC]">
+                    {activeSmartDeck.name}
+                  </h1>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] text-[10px] font-semibold uppercase tracking-wide">
+                    <Zap className="w-3 h-3" />
+                    Smart
+                  </span>
+                </div>
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-xl">
+                  {smartFilterSummary(activeSmartDeck.filter)}
+                  {activeSmartDeck.description ? ` — ${activeSmartDeck.description}` : ''}
+                  {' '}Membership updates automatically as your SRS state changes.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums pt-0.5">
+                  <span>{stats.total} {stats.total === 1 ? 'word' : 'words'} now</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{stats.easy} easy</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{stats.good} good</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{stats.hard} hard</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{stats.new} new</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onStudySmartDeck(activeSmartDeck)}
+                  disabled={viewCards.length === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <Play className="w-4 h-4" />
+                  Study This Set ({viewCards.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModal({ type: 'delete-smart-deck', smartDeck: activeSmartDeck })}
+                  aria-label={`Delete smart deck ${activeSmartDeck.name}`}
+                  className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#2E2A25]">
             <div className="space-y-1.5">
               <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC]">
-                {selectedDeck.name}
+                {selectedDeck?.name ?? ''}
               </h1>
               {selectedDeck.description && (
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-xl">
@@ -937,6 +1181,18 @@ export function DeckWorkspace({
                       <FileUp className="w-3.5 h-3.5 text-[#78716C]" />
                       Export JSON
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        exportDeckAsCsv(selectedDeck, deckCards);
+                        onNotify(`Exported "${selectedDeck.name}" as CSV`, 'success');
+                      }}
+                      className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-[#78716C]" />
+                      Export CSV
+                    </button>
                     <div className="my-1 border-t border-slate-200 dark:border-[#2E2A25]" />
                     <button
                       type="button"
@@ -955,9 +1211,10 @@ export function DeckWorkspace({
               </div>
             </div>
           </div>
+          )}
 
           {/* Search & Minimal Filter Strip */}
-          {deckCards.length > 0 && (
+          {viewCards.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 max-w-md">
                 <div className="relative flex-1">
@@ -981,6 +1238,7 @@ export function DeckWorkspace({
                   )}
                 </div>
 
+                {!activeSmartDeck && (
                 <button
                   type="button"
                   onClick={() => openAddWords('single')}
@@ -989,6 +1247,7 @@ export function DeckWorkspace({
                   <Plus className="w-4 h-4" />
                   <span>New Word</span>
                 </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -1033,7 +1292,7 @@ export function DeckWorkspace({
           )}
 
           {/* Bulk action bar (visible in selection mode) */}
-          {selectionMode && deckCards.length > 0 && (
+          {selectionMode && viewCards.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 px-4 py-3 rounded-2xl bg-[#F3EFE8]/80 dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25]">
               <span className="text-xs font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
                 {selectedCardIds.size} selected
@@ -1091,14 +1350,19 @@ export function DeckWorkspace({
 
           {/* Uncluttered Word Pair List */}
           <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl">
-            {deckCards.length === 0 ? (
+            {viewCards.length === 0 ? (
               <div className="py-14 px-6 text-center space-y-4">
                 <p className="font-display text-xl font-medium text-[#1C1917] dark:text-[#F5F2EC]">
-                  This deck has no words yet
+                  {activeSmartDeck
+                    ? 'No words match this smart deck right now'
+                    : 'This deck has no words yet'}
                 </p>
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
-                  Add words individually or paste a list in <code className="font-mono">word - translation</code> format.
+                  {activeSmartDeck
+                    ? 'The filter matches no cards at the moment — it will populate automatically as cards enter the matching SRS state.'
+                    : <>Add words individually or paste a list in <code className="font-mono">word - translation</code> format.</>}
                 </p>
+                {!activeSmartDeck && (
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                   <button
                     type="button"
@@ -1117,6 +1381,7 @@ export function DeckWorkspace({
                     Bulk Import
                   </button>
                 </div>
+                )}
               </div>
             ) : filteredCards.length === 0 ? (
               <div className="py-12 px-6 text-center">
@@ -1561,8 +1826,28 @@ export function DeckWorkspace({
                     <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
                       Paste one entry per line as{' '}
                       <code className="font-mono">{languageName} word - meaning</code>.
-                      Optionally add an example sentence after <code className="font-mono">|</code>.
+                      Tabs, semicolons, commas and{' '}
+                      <code className="font-mono">word,translation,example</code> CSV
+                      rows also work — or load a <code className="font-mono">.csv</code>/
+                      <code className="font-mono">.txt</code> file below. Add an example
+                      sentence after <code className="font-mono">|</code>.
                     </p>
+
+                    <button
+                      type="button"
+                      onClick={() => bulkFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309] transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Import .csv / .txt file
+                    </button>
+                    <input
+                      ref={bulkFileInputRef}
+                      type="file"
+                      accept=".csv,.txt,.tsv,text/csv,text/plain"
+                      className="hidden"
+                      onChange={handleBulkFileImport}
+                    />
 
                     <textarea
                       ref={bulkTextRef}
@@ -1784,6 +2069,172 @@ export function DeckWorkspace({
                   </button>
                 </div>
               </form>
+            )}
+
+            {modal.type === 'create-smart-deck' && (
+              <form onSubmit={handleSmartDeckSubmit} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <div>
+                    <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                      New Smart Deck
+                    </h2>
+                    <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+                      A live view over your cards — membership updates as you study.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={smartDeckName}
+                    onChange={(e) => setSmartDeckName(e.target.value)}
+                    placeholder="e.g., Words to Review, Leech Squad"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Description (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={smartDeckDesc}
+                    onChange={(e) => setSmartDeckDesc(e.target.value)}
+                    placeholder="What is this set for?"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E]">
+                    Include cards matching any of these
+                  </span>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {SMART_FILTER_OPTIONS.map((opt) => {
+                      const checked = Boolean(smartDeckFilter[opt.key]);
+                      return (
+                        <label
+                          key={opt.key}
+                          className={`flex items-start gap-3 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                            checked
+                              ? 'border-[#B45309] dark:border-[#D97706] bg-[#FAF8F5] dark:bg-[#25221E]'
+                              : 'border-slate-200 dark:border-[#2E2A25] bg-white dark:bg-[#1C1A17] hover:border-slate-300 dark:hover:border-[#443E37]'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              setSmartDeckFilter((prev) => ({
+                                ...prev,
+                                [opt.key]: e.target.checked || undefined,
+                              }))
+                            }
+                            className="mt-0.5 w-4 h-4 accent-[#B45309] rounded shrink-0"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
+                              {opt.label}
+                            </span>
+                            <span className="block text-xs text-[#78716C] dark:text-[#A8A29E]">
+                              {opt.hint}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                    Currently matches{' '}
+                    <strong className="text-[#B45309] dark:text-[#F59E0B]">
+                      {smartPreviewCount}
+                    </strong>{' '}
+                    {smartPreviewCount === 1 ? 'word' : 'words'}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!smartDeckName.trim() || smartPreviewCount === 0}
+                    className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    Create Smart Deck
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {modal.type === 'delete-smart-deck' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
+                  <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+                    Delete Smart Deck
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="p-1.5 rounded-md text-[#78716C]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
+                  Delete{' '}
+                  <strong className="text-[#1C1917] dark:text-[#F5F2EC]">
+                    {modal.smartDeck.name}
+                  </strong>
+                  ? This only removes the saved filter — your words and study
+                  progress are not affected.
+                </p>
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setModal({ type: 'none' })}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await onDeleteSmartDeck(modal.smartDeck.id);
+                        if (selectedSmartDeckId === modal.smartDeck.id) {
+                          setSelectedSmartDeckId(null);
+                        }
+                        setModal({ type: 'none' });
+                      } catch {
+                        onNotify('Could not delete the smart deck. Please try again.', 'error');
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
+                  >
+                    Delete Smart Deck
+                  </button>
+                </div>
+              </div>
             )}
       </Modal>
     </div>

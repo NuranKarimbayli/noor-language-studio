@@ -138,6 +138,32 @@ export function exportDeckAsJson(deck: Deck, deckCards: VocabCard[]): void {
   URL.revokeObjectURL(url);
 }
 
+export function exportDeckAsCsv(deck: Deck, deckCards: VocabCard[]): void {
+  // Always quote fields so the file round-trips through parseBulkLines even
+  // when words/translations contain commas.
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const header = 'word,translation,example';
+  const rows = deckCards.map((c) =>
+    [c.word, c.translation, c.exampleSentence ?? ''].map(q).join(',')
+  );
+  const blob = new Blob([[header, ...rows].join('\n')], {
+    type: 'text/csv;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  const slug =
+    deck.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'vocabulary-deck';
+  anchor.href = url;
+  anchor.download = `${slug}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 const VALID_CONFIDENCE = new Set<ConfidenceLevel>(['new', 'hard', 'good', 'easy']);
 const VALID_DIFFICULTY = new Set<DifficultyLevel>(['easy', 'medium', 'hard']);
 

@@ -28,6 +28,7 @@ const SESSION_MODE_LABELS: Record<SessionMode, string> = {
   listening: 'Listening',
   typing: 'Typing',
   'fill-blank': 'Fill Blank',
+  speaking: 'Speaking',
 };
 
 function formatSessionTime(iso: string): string {
@@ -107,7 +108,7 @@ function AccuracySparkline({ sessions }: { sessions: SessionRecord[] }) {
 
 function dayActivityValue(day: ActivityDay | undefined): number {
   if (!day) return 0;
-  return day.reviews + day.quizzes * 2;
+  return day.reviews + day.quizzes * 2 + (day.cardsAdded ?? 0);
 }
 
 function intensityLevel(value: number): 0 | 1 | 2 | 3 | 4 {
@@ -130,6 +131,7 @@ interface HeatCell {
   date: string;
   value: number;
   reviews: number;
+  added: number;
 }
 
 export function ActivitySection({
@@ -165,6 +167,7 @@ export function ActivitySection({
         date: dateStr,
         value: dayActivityValue(rec),
         reviews: rec?.reviews ?? 0,
+        added: rec?.cardsAdded ?? 0,
       });
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -175,6 +178,11 @@ export function ActivitySection({
   const todayKey = getLocalDateString();
   const todayRecord = activityByDate.get(todayKey);
   const todayReviews = todayRecord?.reviews ?? 0;
+  const todayAdded = todayRecord?.cardsAdded ?? 0;
+  const totalCardsAdded = useMemo(
+    () => activity.reduce((sum, d) => sum + (d.cardsAdded ?? 0), 0),
+    [activity]
+  );
   const goalPct = Math.min(100, Math.round((todayReviews / dailyGoal) * 100));
   const goalReached = todayReviews >= dailyGoal;
 
@@ -233,7 +241,7 @@ export function ActivitySection({
               cell ? (
                 <div
                   key={cell.date}
-                  title={`${cell.date} — ${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}`}
+                  title={`${cell.date} — ${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}${cell.added > 0 ? ` · ${cell.added} new ${cell.added === 1 ? 'word' : 'words'}` : ''}`}
                   className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-[3px] transition-colors ${LEVEL_CLASSES[intensityLevel(cell.value)]}`}
                 />
               ) : (
@@ -290,7 +298,21 @@ export function ActivitySection({
             {goalReached
               ? 'Daily goal reached — nicely done.'
               : `${dailyGoal - todayReviews} more ${dailyGoal - todayReviews === 1 ? 'word' : 'words'} to hit today's goal.`}
+            {todayAdded > 0 && (
+              <span className="text-emerald-700 dark:text-emerald-400">
+                {' '}
+                · +{todayAdded} new {todayAdded === 1 ? 'word' : 'words'} today
+              </span>
+            )}
           </p>
+          {totalCardsAdded > 0 && (
+            <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+              <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
+                {totalCardsAdded}
+              </span>{' '}
+              new {totalCardsAdded === 1 ? 'word' : 'words'} added all-time
+            </p>
+          )}
         </div>
       </div>
 

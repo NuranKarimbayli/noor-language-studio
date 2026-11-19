@@ -27,6 +27,8 @@ import {
   SessionCompletionSummary,
   SessionConfig,
   SessionRecord,
+  SmartDeck,
+  SmartDeckFilter,
   StudyStats,
   ThemeMode,
   ToastMessage,
@@ -37,6 +39,7 @@ import { preloadVoices, stopSpeaking } from './utils/speechUtils';
 import {
   applySrsOutcome,
   getReviewForecast,
+  getSmartDeckCards,
   getSmartReviewCards,
   graduateLeechCard,
   isCardDue,
@@ -55,6 +58,7 @@ import {
   addDeck,
   addLanguage,
   addSessionRecord,
+  addSmartDeck,
   clearAllData,
   deleteCard as dbDeleteCard,
   deleteCardsByIds,
@@ -63,6 +67,8 @@ import {
   deleteCardsByDecks,
   deleteDecksByLanguage,
   deleteLanguage as dbDeleteLanguage,
+  deleteSmartDeck as dbDeleteSmartDeck,
+  deleteSmartDecksByLanguage,
   getActivityHistory,
   getAllCards,
   getAllDecks,
@@ -70,6 +76,7 @@ import {
   getAppPrefs,
   getSfxMuted,
   getSessionHistory,
+  getSmartDecks,
   getStats,
   getTheme,
   getTtsMuted,
@@ -123,6 +130,7 @@ export default function App() {
   const [ttsMuted, setTtsMuted] = useState<boolean>(false);
   const [activity, setActivity] = useState<ActivityDay[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [smartDecks, setSmartDecks] = useState<SmartDeck[]>([]);
   const [dueBannerDismissedFor, setDueBannerDismissedFor] = useState<string>('');
   const [appPrefs, setAppPrefs] = useState<AppPrefs>({
     showToasts: true,
@@ -153,6 +161,7 @@ export default function App() {
           loadedActivity,
           loadedPrefs,
           loadedSessions,
+          loadedSmartDecks,
         ] = await Promise.all([
           getAllLanguages(),
           getAllDecks(),
@@ -164,6 +173,7 @@ export default function App() {
           getActivityHistory(),
           getAppPrefs(),
           getSessionHistory(50),
+          getSmartDecks(),
         ]);
 
         setLanguages(loadedLanguages);
@@ -175,6 +185,7 @@ export default function App() {
         setTtsMuted(loadedTtsMuted);
         setActivity(loadedActivity);
         setSessions(loadedSessions);
+        setSmartDecks(loadedSmartDecks);
         setAppPrefs(loadedPrefs);
 
         setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
@@ -289,6 +300,11 @@ export default function App() {
     return cards.filter((c) => deckIds.has(c.deckId));
   }, [cards, languageDecks]);
 
+  const languageSmartDecks = useMemo(
+    () => smartDecks.filter((s) => s.languageId === activeLanguage.id),
+    [smartDecks, activeLanguage.id]
+  );
+
   // Due-today count for the workspace entry banner
   const dueTodayCount = useMemo(
     () => getReviewForecast(languageCards).today,
@@ -397,7 +413,7 @@ export default function App() {
 
   // Record daily study activity (reviews / quizzes) into IndexedDB
   const bumpActivity = useCallback(
-    (delta: { reviews?: number; quizzes?: number; correct?: number }) => {
+    (delta: { reviews?: number; quizzes?: number; correct?: number; cardsAdded?: number }) => {
       const date = getLocalDateString();
       setActivity((prev) => {
         const existing = prev.find((d) => d.date === date);
@@ -406,6 +422,7 @@ export default function App() {
           reviews: (existing?.reviews ?? 0) + (delta.reviews ?? 0),
           quizzes: (existing?.quizzes ?? 0) + (delta.quizzes ?? 0),
           correct: (existing?.correct ?? 0) + (delta.correct ?? 0),
+          cardsAdded: (existing?.cardsAdded ?? 0) + (delta.cardsAdded ?? 0),
         };
         putActivityDay(nextDay).catch(console.error);
         return existing
@@ -490,6 +507,7 @@ export default function App() {
       const removedDecks = decks.filter((d) => d.languageId === languageId);
       const removedDeckIds = new Set(removedDecks.map((d) => d.id));
       const removedCards = cards.filter((c) => removedDeckIds.has(c.deckId));
+      const removedSmartDecks = smartDecks.filter((s) => s.languageId === languageId);
       const wasActive = activeLanguageId === languageId;
       const remaining = languages.filter((l) => l.id !== languageId);
       const nextActiveId = wasActive ? remaining[0]?.id ?? '' : activeLanguageId;
@@ -497,10 +515,12 @@ export default function App() {
         dbDeleteLanguage(languageId),
         deleteDecksByLanguage(languageId),
         deleteCardsByDecks([...removedDeckIds]),
+        deleteSmartDecksByLanguage(languageId),
       ]);
       setLanguages(remaining);
       setDecks((prev) => prev.filter((d) => d.languageId !== languageId));
       setCards((prev) => prev.filter((c) => !removedDeckIds.has(c.deckId)));
+      setSmartDecks((prev) => prev.filter((s) => s.languageId !== languageId));
       if (selectedDeckId && removedDeckIds.has(selectedDeckId)) {
         setSelectedDeckId('');
       }
@@ -518,6 +538,7 @@ export default function App() {
             addLanguage(target),
             ...removedDecks.map((d) => addDeck(d)),
             putCards(removedCards),
+            ...removedSmartDecks.map((s) => addSmartDeck(s)),
           ])
             .then(() => {
               setLanguages((prev) => [
@@ -532,13 +553,17 @@ export default function App() {
                 ...removedCards,
                 ...prev.filter((c) => !removedDeckIds.has(c.deckId)),
               ]);
+              setSmartDecks((prev) => [
+                ...removedSmartDecks,
+                ...prev.filter((s) => s.languageId !== target.id),
+              ]);
               if (wasActive) setActiveLanguageId(target.id);
             })
             .catch(console.error);
         },
       });
     },
-    [languages, decks, cards, selectedDeckId, activeSession, activeLanguageId, notify]
+    [languages, decks, cards, smartDecks, selectedDeckId, activeSession, activeLanguageId, notify]
   );
 
   // Deck CRUD handlers (scoped to activeLanguage.id)
@@ -647,8 +672,9 @@ export default function App() {
       };
       await addCard(newCard);
       setCards((prev) => [newCard, ...prev]);
+      bumpActivity({ cardsAdded: 1 });
     },
-    []
+    [bumpActivity]
   );
 
   const handleBulkAddCards = useCallback(
@@ -674,8 +700,9 @@ export default function App() {
       }));
       await putCards(created);
       setCards((prev) => [...created, ...prev]);
+      if (created.length > 0) bumpActivity({ cardsAdded: created.length });
     },
-    []
+    [bumpActivity]
   );
 
   const handleUpdateCard = useCallback(
@@ -808,8 +835,9 @@ export default function App() {
       setDecks((prev) => [...prev, newDeck]);
       setCards((prev) => [...importedCards, ...prev]);
       setSelectedDeckId(newDeck.id);
+      if (importedCards.length > 0) bumpActivity({ cardsAdded: importedCards.length });
     },
-    [activeLanguage.id]
+    [activeLanguage.id, bumpActivity]
   );
 
   const openQuizSetup = useCallback((deckId?: string) => {
@@ -939,6 +967,69 @@ export default function App() {
       smartCardIds: due.map((c) => c.id),
     });
   }, [languageCards, notify]);
+
+  // Smart decks: saved dynamic filters over the language's cards
+  const handleCreateSmartDeck = useCallback(
+    async (data: { name: string; description?: string; filter: SmartDeckFilter }) => {
+      const smartDeck: SmartDeck = {
+        id: createId('smart'),
+        languageId: activeLanguage.id,
+        name: data.name.trim(),
+        description: data.description?.trim() || undefined,
+        createdAt: new Date().toISOString(),
+        filter: data.filter,
+      };
+      await addSmartDeck(smartDeck);
+      setSmartDecks((prev) => [...prev, smartDeck]);
+      notify(`Smart deck "${smartDeck.name}" created`, 'success');
+    },
+    [activeLanguage.id, notify]
+  );
+
+  const handleDeleteSmartDeck = useCallback(
+    async (smartDeckId: string) => {
+      const removed = smartDecks.find((s) => s.id === smartDeckId);
+      await dbDeleteSmartDeck(smartDeckId);
+      setSmartDecks((prev) => prev.filter((s) => s.id !== smartDeckId));
+      if (removed) {
+        notify(`Deleted smart deck "${removed.name}"`, 'info', {
+          label: 'Undo',
+          onAction: () => {
+            void addSmartDeck(removed)
+              .then(() => {
+                setSmartDecks((prev) => [
+                  removed,
+                  ...prev.filter((s) => s.id !== removed.id),
+                ]);
+              })
+              .catch(console.error);
+          },
+        });
+      }
+    },
+    [smartDecks, notify]
+  );
+
+  // Study a smart deck: resolve its live membership into a quiz pool
+  const handleStudySmartDeck = useCallback(
+    (smartDeck: SmartDeck) => {
+      const pool = getSmartDeckCards(languageCards, smartDeck.filter);
+      if (pool.length === 0) {
+        notify(`"${smartDeck.name}" has no matching words right now`, 'info');
+        return;
+      }
+      setActiveSession({
+        mode: 'multiple-choice',
+        deckIds: Array.from(new Set(pool.map((c) => c.deckId))),
+        direction: 'word-to-translation',
+        questionCount: Math.min(pool.length, 20),
+        timerSeconds: 0,
+        smartReviewOnly: true,
+        smartCardIds: pool.map((c) => c.id),
+      });
+    },
+    [languageCards, notify]
+  );
 
   // Bulk card operations from the deck word list (multi-select)
   const handleBulkDeleteCards = useCallback(
@@ -1523,6 +1614,10 @@ export default function App() {
                       onBulkUpdateCards={handleBulkUpdateCards}
                       onImportDeckJson={handleImportDeckJson}
                       onPracticeDeck={(deckId) => openQuizSetup(deckId)}
+                      smartDecks={languageSmartDecks}
+                      onCreateSmartDeck={handleCreateSmartDeck}
+                      onDeleteSmartDeck={handleDeleteSmartDeck}
+                      onStudySmartDeck={handleStudySmartDeck}
                       onNotify={notify}
                       ttsMuted={ttsMuted}
                       voice={activeVoice}

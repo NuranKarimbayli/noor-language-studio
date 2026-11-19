@@ -6,6 +6,7 @@ import {
   Deck,
   LanguageItem,
   SessionRecord,
+  SmartDeck,
   StudyStats,
   ThemeMode,
   VocabCard,
@@ -51,6 +52,11 @@ interface NoorStudioDB extends DBSchema {
     key: string;
     value: SessionRecord;
   };
+  smartDecks: {
+    key: string;
+    value: SmartDeck;
+    indexes: { 'by-languageId': string };
+  };
   meta: {
     key: string;
     value: unknown;
@@ -58,7 +64,7 @@ interface NoorStudioDB extends DBSchema {
 }
 
 const DB_NAME = 'noor-studio-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const SEED_COMPLETED_KEY = 'seed-completed';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
@@ -104,6 +110,15 @@ function getDB(): Promise<IDBPDatabase<NoorStudioDB>> {
         // v5: completed-session history for accuracy trends
         if (!db.objectStoreNames.contains('sessions')) {
           db.createObjectStore('sessions', { keyPath: 'id' });
+        }
+        // v6: saved dynamic (smart) decks
+        if (!db.objectStoreNames.contains('smartDecks')) {
+          const store = db.createObjectStore('smartDecks', {
+            keyPath: 'id',
+          }) as unknown as {
+            createIndex: (indexName: string, keyPath: string) => unknown;
+          };
+          store.createIndex('by-languageId', 'languageId');
         }
       },
     }).catch((error) => {
@@ -551,12 +566,36 @@ export async function addSessionRecord(record: SessionRecord): Promise<void> {
   await tx.done;
 }
 
+// Smart decks (saved dynamic filters)
+export async function getSmartDecks(): Promise<SmartDeck[]> {
+  const db = await getDB();
+  return db.getAll('smartDecks');
+}
+
+export async function addSmartDeck(smartDeck: SmartDeck): Promise<void> {
+  const db = await getDB();
+  await db.put('smartDecks', smartDeck);
+}
+
+export async function deleteSmartDeck(smartDeckId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('smartDecks', smartDeckId);
+}
+
+export async function deleteSmartDecksByLanguage(languageId: string): Promise<void> {
+  const db = await getDB();
+  const all = await db.getAll('smartDecks');
+  await Promise.all(
+    all.filter((s) => s.languageId === languageId).map((s) => db.delete('smartDecks', s.id))
+  );
+}
+
 /**
  * Clear all data (for testing or reset)
  */
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'meta'], 'readwrite');
+  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'smartDecks', 'meta'], 'readwrite');
   await Promise.all([
     tx.objectStore('languages').clear(),
     tx.objectStore('decks').clear(),
@@ -567,6 +606,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('ttsMuted').clear(),
     tx.objectStore('activity').clear(),
     tx.objectStore('sessions').clear(),
+    tx.objectStore('smartDecks').clear(),
     tx.objectStore('meta').clear(),
   ]);
   await tx.done;

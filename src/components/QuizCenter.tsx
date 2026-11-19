@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Flame,
   Lightbulb,
+  Mic,
   Play,
   RotateCcw,
   SlidersHorizontal,
@@ -31,8 +32,11 @@ import {
 import { createBlankedSentence, evaluateTypedAnswer } from '../utils/textUtils';
 import { matchesDifficultyFilter } from '../utils/storage';
 import {
+  isSpeechRecognitionSupported,
   isVoiceSupported,
   speakText,
+  startSpeechRecognition,
+  SpeechRecognitionSession,
   stopSpeaking,
   useBrowserVoices,
   VoiceSelection,
@@ -132,6 +136,11 @@ export function QuizCenter({
   const [typedAnswer, setTypedAnswer] = useState('');
   const [hintRevealed, setHintRevealed] = useState(false);
 
+  // Speaking-practice state (Web Speech recognition)
+  const [isListening, setIsListening] = useState(false);
+  const [speechTranscript, setSpeechTranscript] = useState('');
+  const recognitionRef = useRef<SpeechRecognitionSession | null>(null);
+
   // Smooth millisecond cooldown bar state
   const [remainingMs, setRemainingMs] = useState<number>(
     sessionConfig.timerSeconds * 1000
@@ -204,6 +213,20 @@ export function QuizCenter({
             expectedAnswer: expected,
             hintText: expected.toLowerCase() !== card.word.toLowerCase() ? card.word : undefined,
             blankedSentence: blankResult?.blanked ?? card.exampleSentence ?? '',
+          };
+        }
+
+        // Speaking practice: prompt is the native translation, the learner
+        // must produce the target-language word aloud.
+        if (config.mode === 'speaking') {
+          return {
+            id: `q-${index}-${card.id}`,
+            card,
+            deckName,
+            langCode: languageCode,
+            direction: 'translation-to-word',
+            promptText: card.translation,
+            expectedAnswer: card.word,
           };
         }
 
@@ -359,29 +382,40 @@ export function QuizCenter({
 
   const browserVoices = useBrowserVoices();
   const voiceSupported = isVoiceSupported(languageCode, voice, browserVoices);
+  const recognitionSupported = isSpeechRecognitionSupported();
+
+  // The audio model for a question: listening plays the prompt word;
+  // speaking practice plays the target word the learner must repeat.
+  const modelSpeechText = useCallback(
+    (q: QuizQuestion) =>
+      sessionConfig.mode === 'speaking' ? q.expectedAnswer : q.promptText,
+    [sessionConfig.mode]
+  );
 
   const replayPrompt = useCallback(() => {
     if (!currentQuestion || ttsMuted || !voiceSupported) return;
     speakText(
-      currentQuestion.promptText,
+      modelSpeechText(currentQuestion),
       currentQuestion.langCode || languageCode,
       voice
     );
-  }, [currentQuestion, ttsMuted, voiceSupported, voice, languageCode]);
+  }, [currentQuestion, modelSpeechText, ttsMuted, voiceSupported, voice, languageCode]);
 
-  // Listening mode: auto-pronounce the target word for each new question and
-  // cancel any in-flight speech when the question changes or we unmount.
+  // Listening/speaking modes: auto-pronounce the model audio for each new
+  // question and cancel any in-flight speech when it changes or we unmount.
   useEffect(() => {
+    const audioMode =
+      sessionConfig.mode === 'listening' || sessionConfig.mode === 'speaking';
     if (
       phase === 'running' &&
-      sessionConfig.mode === 'listening' &&
+      audioMode &&
       currentQuestion &&
       !currentRecord &&
       !ttsMuted &&
       voiceSupported
     ) {
       speakText(
-        currentQuestion.promptText,
+        modelSpeechText(currentQuestion),
         currentQuestion.langCode || languageCode,
         voice
       );
@@ -394,6 +428,7 @@ export function QuizCenter({
     currentIdx,
     currentQuestion,
     currentRecord,
+    modelSpeechText,
     ttsMuted,
     voiceSupported,
     voice,
@@ -557,6 +592,97 @@ export function QuizCenter({
     },
     [currentQuestion, currentRecord, typedAnswer, sessionConfig.mode, onRecordAnswer, triggerFeedback]
   );
+
+  // Score a recognized transcript exactly like a typed answer.
+  const submitSpeechAnswer = useCallback(
+    (transcript: string) => {
+      if (!currentQuestion || currentRecord || submissionLockRef.current) return;
+      const text = transcript.trim();
+      if (!text) return;
+      submissionLockRef.current = true;
+
+      const evaluation = evaluateTypedAnswer(text, currentQuestion.expectedAnswer);
+      const record: QuizAnswerRecord = {
+        question: currentQuestion,
+        userAnswer: text,
+        status: evaluation.status,
+        isCorrect: evaluation.isCorrect,
+      };
+      setCurrentRecord(record);
+      setRecords((prev) => [...prev, record]);
+      onRecordAnswer(
+        currentQuestion.card.id,
+        evaluation.isCorrect,
+        evaluation.status === 'exact'
+      );
+      triggerFeedback(evaluation.isCorrect);
+      setTimeout(() => {
+        submissionLockRef.current = false;
+      }, 300);
+    },
+    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback]
+  );
+
+  const startListening = useCallback(() => {
+    if (
+      !currentQuestion ||
+      currentRecord ||
+      sessionConfig.mode !== 'speaking' ||
+      !recognitionSupported
+    ) {
+      return;
+    }
+    recognitionRef.current?.abort();
+    setSpeechTranscript('');
+    setIsListening(true);
+    recognitionRef.current = startSpeechRecognition(languageCode, {
+      onTranscript: (text) => setSpeechTranscript(text),
+      onFinal: (text) => {
+        setSpeechTranscript(text);
+        submitSpeechAnswer(text);
+      },
+      onEnd: () => setIsListening(false),
+      onError: () => setIsListening(false),
+    });
+    if (!recognitionRef.current) {
+      setIsListening(false);
+    }
+  }, [
+    currentQuestion,
+    currentRecord,
+    sessionConfig.mode,
+    recognitionSupported,
+    languageCode,
+    submitSpeechAnswer,
+  ]);
+
+  // Auto-arm the microphone for each new speaking question; disarm on
+  // answer/unmount so the recognizer never leaks across questions.
+  useEffect(() => {
+    if (
+      phase === 'running' &&
+      sessionConfig.mode === 'speaking' &&
+      currentQuestion &&
+      !currentRecord &&
+      recognitionSupported
+    ) {
+      startListening();
+      return () => {
+        recognitionRef.current?.abort();
+        recognitionRef.current = null;
+        setIsListening(false);
+      };
+    }
+    return undefined;
+  }, [
+    phase,
+    sessionConfig.mode,
+    currentIdx,
+    currentQuestion,
+    currentRecord,
+    recognitionSupported,
+    startListening,
+  ]);
 
   // Records a timeout answer exactly once — guarded by the same submission
   // lock used by click/keyboard handlers to prevent double-scoring races.
@@ -807,6 +933,16 @@ export function QuizCenter({
           e.preventDefault();
           handleNextQuestion();
         }
+      } else if (sessionConfig.mode === 'speaking') {
+        if (!currentRecord && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          replayPrompt();
+          return;
+        }
+        if (currentRecord && e.key === 'Enter') {
+          e.preventDefault();
+          handleNextQuestion();
+        }
       } else if (currentRecord && e.key === 'Enter') {
         e.preventDefault();
         handleNextQuestion();
@@ -826,13 +962,15 @@ export function QuizCenter({
     replayPrompt,
   ]);
 
-  // Cleanup timer RAF and speech on unmount
+  // Cleanup timer RAF, speech, and recognition on unmount
   useEffect(() => {
     return () => {
       if (timerRafRef.current !== null) {
         window.cancelAnimationFrame(timerRafRef.current);
         timerRafRef.current = null;
       }
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
       stopSpeaking();
     };
   }, []);
@@ -1081,6 +1219,84 @@ export function QuizCenter({
                     {currentQuestion.promptText}
                   </strong>
                 </p>
+              </div>
+            ) : sessionConfig.mode === 'speaking' ? (
+              <div className="py-4">
+                <div className="p-6 sm:p-8 rounded-2xl bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-center space-y-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+                    Say this word aloud
+                  </p>
+                  <p className="font-display text-2xl sm:text-3xl font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
+                    {currentQuestion.promptText}
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={replayPrompt}
+                      disabled={Boolean(currentRecord) || ttsMuted || !voiceSupported}
+                      aria-label="Hear the word"
+                      title={
+                        voiceSupported
+                          ? 'Hear the word pronounced'
+                          : 'Voice not supported for this language'
+                      }
+                      className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#3A352F] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      <Volume2 className="w-5 h-5" />
+                    </button>
+                    {recognitionSupported ? (
+                      <button
+                        type="button"
+                        onClick={startListening}
+                        disabled={Boolean(currentRecord) || isListening}
+                        aria-label={isListening ? 'Listening…' : 'Start speaking'}
+                        className={`inline-flex items-center justify-center gap-2 px-5 h-12 rounded-full text-sm font-semibold transition-colors ${
+                          isListening
+                            ? 'bg-red-600 text-white animate-pulse'
+                            : 'bg-[#B45309] hover:bg-[#92400E] text-white'
+                        } disabled:opacity-50 disabled:pointer-events-none`}
+                      >
+                        <Mic className="w-4 h-4" />
+                        {isListening ? 'Listening…' : currentRecord ? 'Answered' : 'Tap & Speak'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-amber-700 dark:text-amber-400">
+                        Speech recognition unavailable in this browser.
+                      </span>
+                    )}
+                  </div>
+                  {(isListening || speechTranscript) && !currentRecord && (
+                    <p className="text-sm text-[#57534E] dark:text-[#A8A29E] min-h-5">
+                      {isListening ? (
+                        <>
+                          Heard:{' '}
+                          <span className="text-[#1C1917] dark:text-[#F5F2EC] font-medium select-text">
+                            {speechTranscript || '…'}
+                          </span>
+                        </>
+                      ) : speechTranscript ? (
+                        <>
+                          Last heard:{' '}
+                          <span className="text-[#1C1917] dark:text-[#F5F2EC] font-medium select-text">
+                            {speechTranscript}
+                          </span>
+                          {' — '}tap the mic to retry
+                        </>
+                      ) : (
+                        "Didn't catch that — tap the mic and try again."
+                      )}
+                    </p>
+                  )}
+                  {!currentRecord && (
+                    <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
+                      Press{' '}
+                      <kbd className="font-mono px-1.5 py-0.5 rounded bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC]">
+                        R
+                      </kbd>{' '}
+                      to replay the word
+                    </p>
+                  )}
+                </div>
               </div>
             ) : sessionConfig.mode === 'listening' ? (
               <div className="py-4">

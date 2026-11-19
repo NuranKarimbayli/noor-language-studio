@@ -1,4 +1,4 @@
-import { ConfidenceLevel, VocabCard } from '../types';
+import { ConfidenceLevel, SmartDeckFilter, VocabCard } from '../types';
 
 const BOX_INTERVAL_HOURS: Record<number, number> = {
   1: 0,        // Immediate re-review
@@ -221,6 +221,35 @@ export interface ReviewForecast {
   today: number;
   tomorrow: number;
   thisWeek: number;
+}
+
+/**
+ * Evaluates a card against a SmartDeckFilter. Multiple enabled flags act as
+ * OR conditions (e.g. "weak OR due"); an empty filter matches nothing.
+ */
+export function matchesSmartFilter(
+  card: VocabCard,
+  filter: SmartDeckFilter,
+  nowMs = Date.now()
+): boolean {
+  const checks: boolean[] = [];
+  if (filter.weak) checks.push(isWeakCard(card));
+  if (filter.due) checks.push(isCardDue(card, nowMs));
+  if (filter.leeches) checks.push(isLeechCard(card));
+  if (filter.newOnly) checks.push(card.confidence === 'new');
+  if (filter.hardOnly) checks.push(card.confidence === 'hard');
+  return checks.length > 0 && checks.some(Boolean);
+}
+
+export function getSmartDeckCards(
+  cards: VocabCard[],
+  filter: SmartDeckFilter,
+  nowMs = Date.now()
+): VocabCard[] {
+  return sortCardsBySrsPriority(
+    cards.filter((c) => matchesSmartFilter(c, filter, nowMs)),
+    nowMs
+  );
 }
 
 /**

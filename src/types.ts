@@ -9,7 +9,8 @@ export type QuizMode =
   | 'multiple-choice'
   | 'listening'
   | 'typing'
-  | 'fill-blank';
+  | 'fill-blank'
+  | 'speaking';
 
 export type SessionMode = 'flashcards' | QuizMode;
 
@@ -162,6 +163,26 @@ export interface ActivityDay {
   reviews: number; // words reviewed (flashcard ratings + quiz answers)
   quizzes: number; // completed quiz sessions
   correct: number; // correct quiz answers
+  cardsAdded?: number; // new vocabulary cards created that day
+}
+
+// Saved dynamic deck: membership is computed from a card predicate at
+// study/display time rather than stored card references.
+export interface SmartDeckFilter {
+  weak?: boolean; // isWeakCard (hard confidence, low box, or lapsed)
+  due?: boolean; // isCardDue (nextReviewAt <= now or never scheduled)
+  leeches?: boolean; // isLeechCard
+  newOnly?: boolean; // confidence === 'new'
+  hardOnly?: boolean; // confidence === 'hard'
+}
+
+export interface SmartDeck {
+  id: string;
+  languageId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  filter: SmartDeckFilter;
 }
 
 export interface ToastMessage {

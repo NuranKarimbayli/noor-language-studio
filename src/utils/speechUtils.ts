@@ -306,3 +306,132 @@ export function stopSpeaking(): void {
     // ignore
   }
 }
+
+// ---------------------------------------------------------------------------
+// Speech recognition (speaking practice) — Chrome/Edge only, degrades safely
+// ---------------------------------------------------------------------------
+
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+
+export interface SpeechRecognitionSession {
+  stop: () => void;
+  abort: () => void;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<SpeechRecognitionResultLike> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+/**
+ * True when the browser exposes the Web Speech SpeechRecognition API
+ * (Chrome/Edge). Firefox/Safari return false and speaking practice is hidden.
+ */
+export function isSpeechRecognitionSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as Record<string, unknown>;
+  return typeof w.SpeechRecognition === 'function' || typeof w.webkitSpeechRecognition === 'function';
+}
+
+/**
+ * Start a one-shot recognition session for `langCode`. `onTranscript` fires
+ * with the latest transcript (interim and final); `onFinal` fires once with
+ * the final transcript when recognition completes with speech. `onEnd` fires
+ * when the session terminates (with or without results).
+ */
+export function startSpeechRecognition(
+  langCode: string,
+  handlers: {
+    onTranscript?: (text: string, isFinal: boolean) => void;
+    onFinal?: (text: string) => void;
+    onEnd?: () => void;
+    onError?: () => void;
+  }
+): SpeechRecognitionSession | null {
+  if (typeof window === 'undefined' || !isSpeechRecognitionSupported()) return null;
+  const w = window as unknown as Record<string, SpeechRecognitionCtor | undefined>;
+  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  if (!Ctor) return null;
+
+  let rec: SpeechRecognitionLike;
+  try {
+    rec = new Ctor();
+  } catch {
+    return null;
+  }
+
+  rec.lang = resolveLocale(langCode);
+  rec.continuous = false;
+  rec.interimResults = true;
+
+  let finalText = '';
+  let ended = false;
+
+  rec.onresult = (event) => {
+    const results = event.results;
+    let interim = '';
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const text = r[0]?.transcript ?? '';
+      if (r.isFinal) {
+        finalText = text.trim();
+      } else {
+        interim += text;
+      }
+    }
+    const latest = finalText || interim.trim();
+    if (latest) handlers.onTranscript?.(latest, Boolean(finalText));
+  };
+
+  rec.onend = () => {
+    if (ended) return;
+    ended = true;
+    if (finalText) handlers.onFinal?.(finalText);
+    handlers.onEnd?.();
+  };
+
+  rec.onerror = () => {
+    handlers.onError?.();
+    // onend typically follows onerror; guard against double-finalize
+    if (!ended) {
+      ended = true;
+      handlers.onEnd?.();
+    }
+  };
+
+  try {
+    rec.start();
+  } catch {
+    return null;
+  }
+
+  return {
+    stop: () => {
+      try {
+        rec.stop();
+      } catch {
+        // already stopped
+      }
+    },
+    abort: () => {
+      ended = true;
+      try {
+        rec.abort();
+      } catch {
+        // already stopped
+      }
+    },
+  };
+}
