@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Bell,
   FastForward,
@@ -6,6 +6,7 @@ import {
   Moon,
   RotateCcw,
   Sun,
+  TriangleAlert,
   Volume2,
   X,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ interface SettingsModalProps {
   defaultTimerSeconds: number;
   onDefaultTimerChange: (seconds: number) => void;
   onResetDefaults: () => void;
+  onResetStatistics: () => Promise<void> | void;
 }
 
 function Toggle({
@@ -110,20 +112,36 @@ export function SettingsModal({
   defaultTimerSeconds,
   onDefaultTimerChange,
   onResetDefaults,
+  onResetStatistics,
 }: SettingsModalProps) {
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setConfirmResetOpen(false);
+      setConfirmText('');
+      setResetting(false);
+      return;
+    }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        if (confirmResetOpen) {
+          setConfirmResetOpen(false);
+          setConfirmText('');
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, confirmResetOpen]);
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -242,6 +260,29 @@ export function SettingsModal({
           </div>
         </Section>
 
+        {/* Danger Zone */}
+        <Section icon={TriangleAlert} title="Danger Zone">
+          <div className="py-3 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-red-700 dark:text-red-400">
+                Reset statistics
+              </div>
+              <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
+                Permanently erase study streaks, quiz totals, daily activity
+                history, and every card&apos;s review progress. Your languages,
+                decks, and words are kept.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmResetOpen(true)}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 transition-colors"
+            >
+              Reset…
+            </button>
+          </div>
+        </Section>
+
       </div>
 
       <div className="shrink-0 px-6 pb-6 pt-3 border-t border-slate-200 dark:border-[#2E2A25] flex items-center justify-between gap-3">
@@ -260,5 +301,91 @@ export function SettingsModal({
         </button>
       </div>
     </Modal>
+
+    {/* Strict confirmation for resetting study statistics */}
+    <Modal
+      open={open && confirmResetOpen}
+      onClose={() => {
+        setConfirmResetOpen(false);
+        setConfirmText('');
+      }}
+      ariaLabel="Confirm reset statistics"
+      panelClassName="max-w-sm"
+    >
+      <div className="p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="shrink-0 w-9 h-9 rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+            <TriangleAlert className="w-5 h-5 text-red-600 dark:text-red-400" />
+          </span>
+          <div>
+            <h3 className="font-display text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+              Reset all study statistics?
+            </h3>
+            <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 leading-relaxed">
+              This action is <strong className="text-red-700 dark:text-red-400">permanent, irreversible, and cannot be undone</strong>.
+              It will erase:
+            </p>
+          </div>
+        </div>
+        <ul className="text-xs text-[#57534E] dark:text-[#A8A29E] space-y-1.5 pl-1 list-disc list-inside">
+          <li>Study streaks, quiz totals, and best streak</li>
+          <li>Daily activity history and review forecast</li>
+          <li>Every card&apos;s SRS box, due dates, lapses, and review counts</li>
+        </ul>
+        <p className="text-xs text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
+          Your languages, decks, words, difficulty ratings, and settings are{' '}
+          <strong>not</strong> affected.
+        </p>
+        <div>
+          <label
+            htmlFor="reset-confirm-input"
+            className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5"
+          >
+            Type <kbd className="font-mono px-1 rounded bg-[#F3EFE8] dark:bg-[#25221E]">RESET</kbd> to
+            confirm
+          </label>
+          <input
+            id="reset-confirm-input"
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="RESET"
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-[#3A352F] bg-white dark:bg-[#121110] text-sm font-mono text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#A8A29E]/60 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmResetOpen(false);
+              setConfirmText('');
+            }}
+            className="px-3.5 py-2 rounded-lg text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={confirmText !== 'RESET' || resetting}
+            onClick={async () => {
+              setResetting(true);
+              try {
+                await onResetStatistics();
+              } finally {
+                setResetting(false);
+                setConfirmResetOpen(false);
+                setConfirmText('');
+              }
+            }}
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {resetting ? 'Resetting…' : 'Reset statistics'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }

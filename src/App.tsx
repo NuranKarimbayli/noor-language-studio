@@ -64,6 +64,7 @@ import {
   markSeedCompleted,
   putActivityDay,
   putCards,
+  resetStudyProgress,
   saveAppPrefs,
   saveSfxMuted,
   saveStats,
@@ -306,6 +307,22 @@ export default function App() {
     setAppPrefs({ showToasts: true, autoAdvance: false, defaultTimerSeconds: 0 });
     notify('Settings reset to defaults', 'success');
   };
+
+  // Wipe study progress (stats, activity, per-card SRS) while keeping content
+  const handleResetStatistics = useCallback(async () => {
+    const resetCards = await resetStudyProgress();
+    setCards(resetCards);
+    setActivity([]);
+    setStudyStats((prev) => ({
+      ...prev,
+      streakDays: 0,
+      lastStudyDate: null,
+      totalQuizAnswered: 0,
+      totalQuizCorrect: 0,
+      bestQuizStreak: 0,
+    }));
+    notify('Study statistics reset — progress history cleared', 'success');
+  }, [notify]);
 
   // Record daily study activity (reviews / quizzes) into IndexedDB
   const bumpActivity = useCallback(
@@ -936,8 +953,13 @@ export default function App() {
             <button
               type="button"
               onClick={() => setStage('categories')}
-              className="font-display text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC] whitespace-nowrap shrink-0"
+              className="font-display text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC] whitespace-nowrap shrink-0 inline-flex items-center gap-2"
             >
+              <img
+                src="/icon.png"
+                alt=""
+                className="w-7 h-7 rounded-lg object-cover shrink-0"
+              />
               Noor Language Studio
             </button>
 
@@ -1038,8 +1060,13 @@ export default function App() {
                   setActiveSession(null);
                   setStage('categories');
                 }}
-                className="hidden md:inline text-xs text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] whitespace-nowrap shrink-0 pl-2"
+                className="hidden md:inline-flex items-center gap-1.5 text-xs text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] whitespace-nowrap shrink-0 pl-2"
               >
+                <img
+                  src="/icon.png"
+                  alt=""
+                  className="w-4 h-4 rounded object-cover"
+                />
                 Noor Language Studio
               </button>
             </div>
@@ -1309,6 +1336,7 @@ export default function App() {
           setAppPrefs((prev) => ({ ...prev, defaultTimerSeconds: seconds }))
         }
         onResetDefaults={handleResetSettings}
+        onResetStatistics={handleResetStatistics}
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

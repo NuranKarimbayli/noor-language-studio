@@ -17,7 +17,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   return (
     <div
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+      className="fixed bottom-4 right-4 z-50 flex flex-col gap-1.5 max-w-xs w-full pointer-events-none px-4 sm:px-0"
     >
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => {
@@ -47,7 +47,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                 damping: 32,
                 mass: 0.7,
               }}
-              className="pointer-events-auto relative flex items-center justify-between gap-3 pl-4 pr-3 py-3 rounded-xl bg-white dark:bg-[#1C1A17] border border-[#E6E1D8] dark:border-[#2E2A25] shadow-lg shadow-black/5 dark:shadow-black/30 text-sm text-[#1C1917] dark:text-[#F5F2EC] overflow-hidden"
+              className="pointer-events-auto relative flex items-center justify-between gap-2.5 pl-3 pr-1.5 py-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-[#E6E1D8] dark:border-[#2E2A25] shadow-md shadow-black/5 dark:shadow-black/30 text-xs text-[#1C1917] dark:text-[#F5F2EC] overflow-hidden"
             >
               <span
                 className={`absolute left-0 top-0 bottom-0 w-1 ${accentBar[toast.variant]}`}
@@ -57,9 +57,9 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                 initial={{ scale: 0.4, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.05, type: 'spring', stiffness: 500, damping: 20 }}
-                className="flex items-center gap-2.5 min-w-0"
+                className="flex items-center gap-2 min-w-0"
               >
-                <Icon className={`w-4 h-4 shrink-0 ${iconColor}`} />
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />
                 <span className="truncate">{toast.text}</span>
               </motion.div>
               {toast.actionLabel && toast.onAction && (
@@ -71,7 +71,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                     toast.onAction?.();
                     onDismiss(toast.id);
                   }}
-                  className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#B45309] dark:text-[#F59E0B] bg-[#B45309]/10 dark:bg-[#F59E0B]/10 hover:bg-[#B45309]/20 dark:hover:bg-[#F59E0B]/20 transition-colors"
+                  className="shrink-0 px-2 py-0.5 rounded-md text-[11px] font-semibold text-[#B45309] dark:text-[#F59E0B] bg-[#B45309]/10 dark:bg-[#F59E0B]/10 hover:bg-[#B45309]/20 dark:hover:bg-[#F59E0B]/20 transition-colors"
                 >
                   {toast.actionLabel}
                 </motion.button>
@@ -81,10 +81,10 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.88 }}
                 onClick={() => onDismiss(toast.id)}
-                className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
+                className="p-0.5 rounded text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
                 aria-label="Dismiss notification"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </motion.button>
             </motion.div>
           );

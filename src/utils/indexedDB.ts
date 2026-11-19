@@ -537,3 +537,40 @@ export async function markSeedCompleted(): Promise<void> {
   const db = await getDB();
   await db.put('meta', true, SEED_COMPLETED_KEY);
 }
+
+/**
+ * Wipe all study progress while keeping content intact: clears global stats
+ * and daily activity history, and resets every card's SRS/review fields back
+ * to a fresh "new" state. Words, decks, languages, difficulty, mnemonics, and
+ * preferences are preserved. Returns the reset cards for immediate state sync.
+ */
+export async function resetStudyProgress(): Promise<VocabCard[]> {
+  const db = await getDB();
+  const cards = (await db.getAll('cards')) as VocabCard[];
+  const resetCards = cards.map((card) => {
+    const {
+      confidence: _c,
+      reviewCount: _r,
+      lastReviewedAt: _l,
+      srsBox: _s,
+      nextReviewAt: _n,
+      streak: _st,
+      lapses: _la,
+      wrongCount: _w,
+      ...rest
+    } = card;
+    return { ...rest, confidence: 'new' as const, reviewCount: 0 };
+  });
+
+  const tx = db.transaction(['cards', 'stats', 'activity'], 'readwrite');
+  const cardsStore = tx.objectStore('cards');
+  for (const card of resetCards) {
+    cardsStore.put(card);
+  }
+  await Promise.all([
+    tx.objectStore('stats').clear(),
+    tx.objectStore('activity').clear(),
+    tx.done,
+  ]);
+  return resetCards;
+}
