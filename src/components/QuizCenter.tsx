@@ -140,6 +140,8 @@ export function QuizCenter({
   const [isListening, setIsListening] = useState(false);
   const [speechTranscript, setSpeechTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognitionSession | null>(null);
+  const speechTimeoutRef = useRef<number | null>(null);
+  const speechDoneRef = useRef(false);
 
   // Smooth millisecond cooldown bar state
   const [remainingMs, setRemainingMs] = useState<number>(
@@ -632,21 +634,58 @@ export function QuizCenter({
     ) {
       return;
     }
+    if (speechTimeoutRef.current !== null) {
+      window.clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
     recognitionRef.current?.abort();
+    speechDoneRef.current = false;
     setSpeechTranscript('');
     setIsListening(true);
     recognitionRef.current = startSpeechRecognition(languageCode, {
-      onTranscript: (text) => setSpeechTranscript(text),
+      onTranscript: (text, isFinal) => {
+        setSpeechTranscript(text);
+        // Chrome marks a phrase final once the utterance is complete — for a
+        // single vocab word that's the signal to score and move on.
+        if (isFinal && text.trim() && !speechDoneRef.current) {
+          speechDoneRef.current = true;
+          submitSpeechAnswer(text);
+          recognitionRef.current?.stop();
+        }
+      },
       onFinal: (text) => {
         setSpeechTranscript(text);
-        submitSpeechAnswer(text);
+        // Fires when the session ends (timeout/stop) with any transcript —
+        // covers the case where no result was ever marked final.
+        if (!speechDoneRef.current && text.trim()) {
+          speechDoneRef.current = true;
+          submitSpeechAnswer(text);
+        }
       },
-      onEnd: () => setIsListening(false),
-      onError: () => setIsListening(false),
+      onEnd: () => {
+        if (speechTimeoutRef.current !== null) {
+          window.clearTimeout(speechTimeoutRef.current);
+          speechTimeoutRef.current = null;
+        }
+        setIsListening(false);
+      },
+      onError: () => {
+        if (speechTimeoutRef.current !== null) {
+          window.clearTimeout(speechTimeoutRef.current);
+          speechTimeoutRef.current = null;
+        }
+        setIsListening(false);
+      },
     });
     if (!recognitionRef.current) {
       setIsListening(false);
+      return;
     }
+    // Continuous recognition never self-terminates — cap each attempt so a
+    // silent mic can't hold the session open indefinitely.
+    speechTimeoutRef.current = window.setTimeout(() => {
+      recognitionRef.current?.stop();
+    }, 8000);
   }, [
     currentQuestion,
     currentRecord,
@@ -668,6 +707,10 @@ export function QuizCenter({
     ) {
       startListening();
       return () => {
+        if (speechTimeoutRef.current !== null) {
+          window.clearTimeout(speechTimeoutRef.current);
+          speechTimeoutRef.current = null;
+        }
         recognitionRef.current?.abort();
         recognitionRef.current = null;
         setIsListening(false);
@@ -968,6 +1011,10 @@ export function QuizCenter({
       if (timerRafRef.current !== null) {
         window.cancelAnimationFrame(timerRafRef.current);
         timerRafRef.current = null;
+      }
+      if (speechTimeoutRef.current !== null) {
+        window.clearTimeout(speechTimeoutRef.current);
+        speechTimeoutRef.current = null;
       }
       recognitionRef.current?.abort();
       recognitionRef.current = null;

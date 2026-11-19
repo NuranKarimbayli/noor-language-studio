@@ -373,32 +373,31 @@ export function startSpeechRecognition(
   }
 
   rec.lang = resolveLocale(langCode);
-  rec.continuous = false;
+  // Continuous mode: the browser would otherwise end the session after ~1s of
+  // silence. The caller stops the session explicitly (timeout or final result).
+  rec.continuous = true;
   rec.interimResults = true;
 
-  let finalText = '';
+  let transcript = '';
   let ended = false;
 
   rec.onresult = (event) => {
     const results = event.results;
-    let interim = '';
+    transcript = '';
+    let sawFinal = false;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      const text = r[0]?.transcript ?? '';
-      if (r.isFinal) {
-        finalText = text.trim();
-      } else {
-        interim += text;
-      }
+      transcript += `${r[0]?.transcript ?? ''} `;
+      if (r.isFinal) sawFinal = true;
     }
-    const latest = finalText || interim.trim();
-    if (latest) handlers.onTranscript?.(latest, Boolean(finalText));
+    transcript = transcript.trim();
+    if (transcript) handlers.onTranscript?.(transcript, sawFinal);
   };
 
   rec.onend = () => {
     if (ended) return;
     ended = true;
-    if (finalText) handlers.onFinal?.(finalText);
+    if (transcript) handlers.onFinal?.(transcript);
     handlers.onEnd?.();
   };
 
