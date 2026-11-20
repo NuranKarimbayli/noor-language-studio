@@ -560,6 +560,11 @@ export async function putNote(note: Note): Promise<void> {
   await db.put('notes', note);
 }
 
+export async function deleteNote(noteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('notes', noteId);
+}
+
 // Daily activity history operations (keyed by YYYY-MM-DD)
 export async function getActivityHistory(): Promise<ActivityDay[]> {
   const db = await getDB();

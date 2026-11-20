@@ -142,10 +142,13 @@ export interface AppPrefs {
   notesAutoSaveSeconds?: number; // debounce interval for auto-save (1|2|5|10)
 }
 
-// Freeform study notepad, persisted in IndexedDB and included in backups
+// Freeform study notes ("note sheets"), persisted in IndexedDB and included
+// in backups. Multiple notes are supported; pinned notes sort to the top.
 export interface Note {
   id: string;
+  title?: string;
   content: string;
+  pinned?: boolean;
   updatedAt: string; // ISO timestamp
 }
 

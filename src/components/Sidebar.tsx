@@ -185,7 +185,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`hidden lg:flex flex-col shrink-0 bg-[#FAF8F5] dark:bg-[#171513] border-r border-slate-200 dark:border-[#2E2A25] transition-[width] duration-200 ease-out overflow-hidden ${
+      className={`hidden lg:flex flex-col shrink-0 sticky top-16 self-start bg-[#FAF8F5] dark:bg-[#171513] border-r border-slate-200 dark:border-[#2E2A25] transition-[width] duration-200 ease-out overflow-hidden h-[calc(100vh-4rem)] ${
         collapsed ? 'w-[68px]' : 'w-60'
       }`}
     >

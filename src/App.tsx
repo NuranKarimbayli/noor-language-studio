@@ -75,6 +75,7 @@ import {
   deleteLanguage as dbDeleteLanguage,
   deleteSmartDeck as dbDeleteSmartDeck,
   deleteSmartDecksByLanguage,
+  deleteNote as dbDeleteNote,
   getActivityHistory,
   getAllCards,
   getAllDecks,
@@ -351,12 +352,6 @@ export default function App() {
   const voiceReady = useMemo(
     () => !!activeVoice.name && activeVoice.disabled !== true,
     [activeVoice]
-  );
-
-  // The note shown in the notepad — canonical 'main' note, else first note
-  const primaryNote = useMemo(
-    () => notes.find((n) => n.id === 'main') ?? notes[0] ?? null,
-    [notes]
   );
 
   const leechCount = useMemo(
@@ -907,29 +902,81 @@ export default function App() {
     setQuizSetupMode(undefined);
   }, []);
 
-  // Persist the notepad draft — single canonical note ('main'), extra notes
-  // from imported backups are preserved untouched.
+  // Notes CRUD — each sheet is its own persisted record
   const handlePersistNote = useCallback(
-    async (content: string) => {
-      const existing = notes.find((n) => n.id === 'main') ?? notes[0] ?? null;
-      const noteId = existing?.id ?? 'main';
+    async (noteId: string, content: string) => {
+      const existing = notes.find((n) => n.id === noteId);
       const updated: Note = {
         id: noteId,
+        title: existing?.title,
+        pinned: existing?.pinned,
         content,
         updatedAt: new Date().toISOString(),
       };
       await putNote(updated);
-      setNotes((prev) => {
-        const idx = prev.findIndex((n) => n.id === noteId);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = updated;
-          return next;
-        }
-        return [...prev, updated];
-      });
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)));
     },
     [notes]
+  );
+
+  const handleCreateNote = useCallback(async () => {
+    const note: Note = {
+      id: createId('note'),
+      title: 'Untitled note',
+      content: '',
+      updatedAt: new Date().toISOString(),
+    };
+    await putNote(note);
+    setNotes((prev) => [...prev, note]);
+  }, []);
+
+  const patchNote = useCallback(
+    async (noteId: string, patch: Partial<Note>) => {
+      const existing = notes.find((n) => n.id === noteId);
+      if (!existing) return;
+      const updated: Note = {
+        ...existing,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      await putNote(updated);
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)));
+    },
+    [notes]
+  );
+
+  const handleRenameNote = useCallback(
+    (noteId: string, title: string) => {
+      void patchNote(noteId, { title: title || undefined });
+    },
+    [patchNote]
+  );
+
+  const handleTogglePinNote = useCallback(
+    (noteId: string) => {
+      const existing = notes.find((n) => n.id === noteId);
+      if (existing) void patchNote(noteId, { pinned: !existing.pinned });
+    },
+    [notes, patchNote]
+  );
+
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      const removed = notes.find((n) => n.id === noteId);
+      await dbDeleteNote(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      if (removed) {
+        notify(`Deleted "${removed.title?.trim() || 'Untitled note'}"`, 'info', {
+          label: 'Undo',
+          onAction: () => {
+            void putNote(removed)
+              .then(() => setNotes((prev) => [...prev, removed]))
+              .catch(console.error);
+          },
+        });
+      }
+    },
+    [notes, notify]
   );
 
   // Persist a completed session into history (state + IndexedDB)
@@ -1763,9 +1810,13 @@ export default function App() {
 
                   {workspaceView === 'notes' && (
                     <NotesPanel
-                      note={primaryNote}
+                      notes={notes}
                       autoSave={appPrefs.notesAutoSave ?? true}
                       intervalSeconds={appPrefs.notesAutoSaveSeconds ?? 2}
+                      onCreateNote={handleCreateNote}
+                      onRenameNote={handleRenameNote}
+                      onTogglePin={handleTogglePinNote}
+                      onDeleteNote={handleDeleteNote}
                       onPersist={handlePersistNote}
                     />
                   )}

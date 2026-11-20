@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, CloudOff, Loader2, NotebookPen, Save } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Check,
+  CloudOff,
+  Loader2,
+  NotebookPen,
+  Pencil,
+  Pin,
+  PinOff,
+  Plus,
+  Save,
+  Trash2,
+} from 'lucide-react';
 import { Note } from '../types';
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
 
-interface NotesPanelProps {
-  /** The note currently being edited (null = nothing saved yet). */
-  note: Note | null;
-  autoSave: boolean;
-  /** Debounce interval in seconds between auto-save writes. */
-  intervalSeconds: number;
-  /** Persist the draft; resolves when the write completes. */
-  onPersist: (content: string) => Promise<void> | void;
-}
-
-const STATUS_STYLES: Record<SaveStatus, { label: string; className: string; icon: typeof Check }> = {
+const STATUS_STYLES: Record<
+  SaveStatus,
+  { label: string; className: string; icon: typeof Check }
+> = {
   clean: { label: 'Saved', className: 'text-emerald-700 dark:text-emerald-400', icon: Check },
   dirty: { label: 'Unsaved changes', className: 'text-amber-700 dark:text-amber-400', icon: CloudOff },
   saving: { label: 'Saving…', className: 'text-[#78716C] dark:text-[#A8A29E]', icon: Loader2 },
@@ -22,13 +26,38 @@ const STATUS_STYLES: Record<SaveStatus, { label: string; className: string; icon
   error: { label: 'Save failed', className: 'text-red-700 dark:text-red-400', icon: CloudOff },
 };
 
-export function NotesPanel({
-  note,
-  autoSave,
-  intervalSeconds,
-  onPersist,
-}: NotesPanelProps) {
-  const [draft, setDraft] = useState(note?.content ?? '');
+function noteTitle(note: Note): string {
+  return note.title?.trim() || 'Untitled note';
+}
+
+function notePreview(note: Note): string {
+  const text = note.content.replace(/\s+/g, ' ').trim();
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text || 'Empty note';
+}
+
+function formatNoteDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+interface NoteEditorProps {
+  note: Note;
+  autoSave: boolean;
+  intervalSeconds: number;
+  onPersist: (noteId: string, content: string) => Promise<void> | void;
+}
+
+/** Single-note editor with debounce auto-save. Remounts per note via key. */
+function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorProps) {
+  const [draft, setDraft] = useState(note.content);
   const [status, setStatus] = useState<SaveStatus>('clean');
   const draftRef = useRef(draft);
   const dirtyRef = useRef(false);
@@ -36,19 +65,19 @@ export function NotesPanel({
 
   draftRef.current = draft;
 
-  // Sync the draft when the persisted note changes externally
-  // (e.g. backup restore) — never clobber in-progress typing.
+  // Sync when the note's content changes externally (e.g. backup restore)
+  // — never clobber in-progress typing.
   useEffect(() => {
     if (!dirtyRef.current) {
-      setDraft(note?.content ?? '');
+      setDraft(note.content);
     }
-  }, [note?.content]);
+  }, [note.content]);
 
   const flush = useCallback(async () => {
     if (!dirtyRef.current) return;
     setStatus('saving');
     try {
-      await onPersist(draftRef.current);
+      await onPersist(note.id, draftRef.current);
       dirtyRef.current = false;
       setStatus('saved');
       if (savedTimerRef.current) window.clearTimeout(savedTimerRef.current);
@@ -56,7 +85,7 @@ export function NotesPanel({
     } catch {
       setStatus('error');
     }
-  }, [onPersist]);
+  }, [onPersist, note.id]);
 
   // Auto-save: trailing debounce on the configured interval
   useEffect(() => {
@@ -70,8 +99,8 @@ export function NotesPanel({
   // Flush pending changes when leaving the view or closing the tab
   useEffect(() => {
     const onHide = () => {
-      if (dirtyRef.current && autoSave) {
-        void onPersist(draftRef.current);
+      if (dirtyRef.current) {
+        void onPersist(note.id, draftRef.current);
       }
     };
     window.addEventListener('beforeunload', onHide);
@@ -79,7 +108,7 @@ export function NotesPanel({
       window.removeEventListener('beforeunload', onHide);
       onHide();
     };
-  }, [autoSave, onPersist]);
+  }, [autoSave, onPersist, note.id]);
 
   useEffect(
     () => () => {
@@ -100,13 +129,13 @@ export function NotesPanel({
   const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0;
 
   return (
-    <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl overflow-hidden flex flex-col min-h-[28rem]">
+    <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl overflow-hidden flex flex-col min-h-[26rem]">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 dark:border-[#2E2A25] shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <NotebookPen className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
           <span className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC] truncate">
-            Study Notes
+            {noteTitle(note)}
           </span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -140,10 +169,211 @@ export function NotesPanel({
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Jot down grammar rules, example sentences, tricky words, or anything worth remembering…"
-        aria-label="Study notes"
+        aria-label={`Note: ${noteTitle(note)}`}
         spellCheck
         className="flex-1 min-h-[20rem] w-full resize-none bg-transparent px-5 py-4 text-sm leading-relaxed text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#A8A29E] dark:placeholder:text-[#57534E] focus:outline-none"
       />
+    </div>
+  );
+}
+
+interface NotesPanelProps {
+  notes: Note[];
+  autoSave: boolean;
+  intervalSeconds: number;
+  onCreateNote: () => void;
+  onRenameNote: (noteId: string, title: string) => void;
+  onTogglePin: (noteId: string) => void;
+  onDeleteNote: (noteId: string) => void;
+  onPersist: (noteId: string, content: string) => Promise<void> | void;
+}
+
+export function NotesPanel({
+  notes,
+  autoSave,
+  intervalSeconds,
+  onCreateNote,
+  onRenameNote,
+  onTogglePin,
+  onDeleteNote,
+  onPersist,
+}: NotesPanelProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  // Pinned first, then most recently updated
+  const sortedNotes = useMemo(
+    () =>
+      [...notes].sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      }),
+    [notes]
+  );
+
+  // Keep a valid selection; default to the first note
+  useEffect(() => {
+    if (sortedNotes.length === 0) {
+      setActiveId(null);
+      return;
+    }
+    if (!activeId || !sortedNotes.some((n) => n.id === activeId)) {
+      setActiveId(sortedNotes[0].id);
+    }
+  }, [sortedNotes, activeId]);
+
+  // First visit with no notes: create a starter sheet
+  useEffect(() => {
+    if (notes.length === 0) onCreateNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeNote = sortedNotes.find((n) => n.id === activeId) ?? null;
+
+  const commitRename = () => {
+    if (renamingId) {
+      onRenameNote(renamingId, renameDraft.trim());
+      setRenamingId(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-4 items-start">
+      {/* Note sheets list — deck-style */}
+      <aside className="w-full lg:w-60 shrink-0 bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-200 dark:border-[#2E2A25]">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+            Notes · {sortedNotes.length}
+          </span>
+          <button
+            type="button"
+            onClick={onCreateNote}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-[11px] font-semibold transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            New
+          </button>
+        </div>
+        <ul className="max-h-72 lg:max-h-[26rem] overflow-y-auto divide-y divide-slate-100 dark:divide-[#2E2A25] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]">
+          {sortedNotes.map((note) => {
+            const selected = note.id === activeId;
+            const renaming = renamingId === note.id;
+            return (
+              <li key={note.id}>
+                <div
+                  className={`group w-full text-left px-4 py-3 transition-colors ${
+                    selected
+                      ? 'bg-[#B45309]/5 dark:bg-[#D97706]/10'
+                      : 'hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveId(note.id)}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {note.pinned && (
+                          <Pin className="w-3 h-3 text-[#B45309] dark:text-[#F59E0B] shrink-0 fill-current" />
+                        )}
+                        {renaming ? (
+                          <input
+                            autoFocus
+                            value={renameDraft}
+                            onChange={(e) => setRenameDraft(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitRename();
+                              if (e.key === 'Escape') setRenamingId(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 min-w-0 text-sm font-medium bg-transparent border-b border-[#B45309] outline-none text-[#1C1917] dark:text-[#F5F2EC]"
+                            aria-label="Rename note"
+                          />
+                        ) : (
+                          <span className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] truncate">
+                            {noteTitle(note)}
+                          </span>
+                        )}
+                      </div>
+                      {!renaming && (
+                        <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate mt-0.5">
+                          {notePreview(note)}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-[#A8A29E] dark:text-[#57534E] mt-0.5 tabular-nums">
+                        {formatNoteDate(note.updatedAt)}
+                      </p>
+                    </button>
+                    {!renaming && (
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenamingId(note.id);
+                            setRenameDraft(note.title ?? '');
+                          }}
+                          aria-label={`Rename ${noteTitle(note)}`}
+                          title="Rename"
+                          className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onTogglePin(note.id)}
+                          aria-label={note.pinned ? `Unpin ${noteTitle(note)}` : `Pin ${noteTitle(note)}`}
+                          title={note.pinned ? 'Unpin' : 'Pin to top'}
+                          className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors"
+                        >
+                          {note.pinned ? (
+                            <PinOff className="w-3 h-3" />
+                          ) : (
+                            <Pin className="w-3 h-3" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteNote(note.id)}
+                          aria-label={`Delete ${noteTitle(note)}`}
+                          title="Delete"
+                          className="p-1 rounded-md text-red-700/70 dark:text-red-400/70 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+          {sortedNotes.length === 0 && (
+            <li className="px-4 py-6 text-center text-xs text-[#78716C] dark:text-[#A8A29E]">
+              No notes yet — create your first sheet.
+            </li>
+          )}
+        </ul>
+      </aside>
+
+      {/* Editor */}
+      <div className="flex-1 min-w-0 w-full">
+        {activeNote ? (
+          <NoteEditor
+            key={activeNote.id}
+            note={activeNote}
+            autoSave={autoSave}
+            intervalSeconds={intervalSeconds}
+            onPersist={onPersist}
+          />
+        ) : (
+          <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-10 text-center text-sm text-[#78716C] dark:text-[#A8A29E]">
+            Select or create a note to start writing.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
