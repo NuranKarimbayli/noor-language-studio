@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   AlertCircle,
   BookOpen,
@@ -521,7 +521,16 @@ export function QuizSetupModal({
                 disabled={maxEligibleCount === 0}
                 value={Math.max(1, effectiveCount)}
                 onChange={(e) => setQuestionCount(Number(e.target.value))}
-                className="w-full accent-[#B45309] cursor-pointer disabled:opacity-40"
+                className="noor-range w-full disabled:opacity-40"
+                style={
+                  {
+                    '--range-pct': `${
+                      maxEligibleCount > 1
+                        ? ((Math.max(1, effectiveCount) - 1) / (maxEligibleCount - 1)) * 100
+                        : 0
+                    }%`,
+                  } as CSSProperties
+                }
               />
               <div className="flex items-center gap-1.5 flex-wrap">
                 {[5, 10, 20].map((preset) => (

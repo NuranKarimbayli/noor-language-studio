@@ -222,3 +222,77 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Range slider — themed track + thumb for light & dark modes.
+   Set --range-pct (0-100) inline to draw the filled portion. */
+.noor-range {
+  --range-track: #e7e5e4;
+  --range-thumb-border: #ffffff;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 20px;
+  cursor: pointer;
+}
+
+.dark .noor-range {
+  --range-track: #3a352f;
+  --range-thumb-border: #1c1a17;
+}
+
+.noor-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #b45309 0%,
+    #b45309 var(--range-pct, 0%),
+    var(--range-track) var(--range-pct, 0%),
+    var(--range-track) 100%
+  );
+}
+
+.noor-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #b45309;
+  border: 2px solid var(--range-thumb-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.noor-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.35);
+}
+
+.noor-range::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--range-track);
+}
+
+.noor-range::-moz-range-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: #b45309;
+}
+
+.noor-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #b45309;
+  border: 2px solid var(--range-thumb-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.noor-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.35);
+}
+
+.noor-range:disabled {
+  cursor: not-allowed;
+}
