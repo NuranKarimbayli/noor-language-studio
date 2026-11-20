@@ -42,7 +42,7 @@ export function OnboardingChecklist({
           <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
             Get started
           </div>
-          <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
+          <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5 tabular-nums">
             {doneCount} of {steps.length - 1} setup steps complete
           </p>
         </div>
@@ -55,16 +55,52 @@ export function OnboardingChecklist({
           <X className="w-4 h-4" />
         </button>
       </div>
-      <ul className="mt-3 space-y-2">
+
+      {/* Progress bar — animates width smoothly as steps complete */}
+      <div
+        className="mt-3 h-1 rounded-full bg-[#F3EFE8] dark:bg-[#25221E] overflow-hidden"
+        role="progressbar"
+        aria-valuenow={doneCount}
+        aria-valuemin={0}
+        aria-valuemax={steps.length - 1}
+        aria-label="Getting started progress"
+      >
+        <div
+          className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400 transition-[width] duration-500 ease-out"
+          style={{ width: `${(doneCount / (steps.length - 1)) * 100}%` }}
+        />
+      </div>
+
+      <ul className="mt-3 space-y-1">
         {steps.map((step, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-sm">
+          <li
+            key={i}
+            className={`flex items-start gap-2.5 text-sm rounded-lg px-2 py-1.5 -mx-2 ${
+              step.done ? 'animate-step-glow' : ''
+            }`}
+          >
             {step.done ? (
-              <Check className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <Check className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400 animate-check-pop" />
             ) : (
               <Circle className="w-4 h-4 mt-0.5 shrink-0 text-[#C4BEB4] dark:text-[#443E37]" />
             )}
-            <span className={step.done ? 'text-[#78716C] dark:text-[#A8A29E] line-through' : 'text-[#1C1917] dark:text-[#F5F2EC]'}>
-              {step.label}
+            <span
+              className={`transition-colors duration-500 ${
+                step.done
+                  ? 'text-[#78716C] dark:text-[#A8A29E]'
+                  : 'text-[#1C1917] dark:text-[#F5F2EC]'
+              }`}
+            >
+              <span className="relative">
+                {step.label}
+                {/* Animated strikethrough — scales in when the step completes */}
+                <span
+                  aria-hidden="true"
+                  className={`onboarding-strike absolute left-0 top-[0.58em] h-px w-full bg-current origin-left transition-transform duration-500 ease-out ${
+                    step.done ? 'scale-x-100' : 'scale-x-0'
+                  }`}
+                />
+              </span>
               {!step.done && (
                 <span className="block text-[11px] text-[#78716C] dark:text-[#A8A29E]">{step.hint}</span>
               )}
