@@ -5,6 +5,7 @@ import {
   ConfidenceLevel,
   Deck,
   LanguageItem,
+  Note,
   SessionRecord,
   SmartDeck,
   StudyStats,
@@ -61,10 +62,14 @@ interface NoorStudioDB extends DBSchema {
     key: string;
     value: unknown;
   };
+  notes: {
+    key: string;
+    value: Note;
+  };
 }
 
 const DB_NAME = 'noor-studio-db';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const SEED_COMPLETED_KEY = 'seed-completed';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
@@ -119,6 +124,10 @@ function getDB(): Promise<IDBPDatabase<NoorStudioDB>> {
             createIndex: (indexName: string, keyPath: string) => unknown;
           };
           store.createIndex('by-languageId', 'languageId');
+        }
+        // v7: study notepad notes
+        if (!db.objectStoreNames.contains('notes')) {
+          db.createObjectStore('notes', { keyPath: 'id' });
         }
       },
     }).catch((error) => {
@@ -521,12 +530,34 @@ export async function getAppPrefs(): Promise<AppPrefs> {
     autoSpeakPrompt: stored?.autoSpeakPrompt === true,
     autoSpeakAnswer: stored?.autoSpeakAnswer === true,
     reminderEnabled: stored?.reminderEnabled === true,
+    notesAutoSave: stored?.notesAutoSave !== false,
+    notesAutoSaveSeconds:
+      typeof stored?.notesAutoSaveSeconds === 'number' &&
+      [1, 2, 5, 10].includes(stored.notesAutoSaveSeconds)
+        ? stored.notesAutoSaveSeconds
+        : 2,
   };
 }
 
 export async function saveAppPrefs(prefs: AppPrefs): Promise<void> {
   const db = await getDB();
   await db.put('meta', prefs, APP_PREFS_KEY);
+}
+
+// Notes operations (study notepad)
+export async function getAllNotes(): Promise<Note[]> {
+  const db = await getDB();
+  return db.getAll('notes');
+}
+
+export async function getNote(noteId: string): Promise<Note | undefined> {
+  const db = await getDB();
+  return db.get('notes', noteId);
+}
+
+export async function putNote(note: Note): Promise<void> {
+  const db = await getDB();
+  await db.put('notes', note);
 }
 
 // Daily activity history operations (keyed by YYYY-MM-DD)
@@ -595,7 +626,7 @@ export async function deleteSmartDecksByLanguage(languageId: string): Promise<vo
  */
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'smartDecks', 'meta'], 'readwrite');
+  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'smartDecks', 'meta', 'notes'], 'readwrite');
   await Promise.all([
     tx.objectStore('languages').clear(),
     tx.objectStore('decks').clear(),
@@ -608,6 +639,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('sessions').clear(),
     tx.objectStore('smartDecks').clear(),
     tx.objectStore('meta').clear(),
+    tx.objectStore('notes').clear(),
   ]);
   await tx.done;
 }

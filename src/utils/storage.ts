@@ -4,6 +4,7 @@ import {
   Deck,
   DifficultyLevel,
   LanguageItem,
+  Note,
   StudyStats,
   VocabCard,
 } from '../types';
@@ -247,6 +248,7 @@ export interface FullBackupPayload {
   cards: VocabCard[];
   stats?: StudyStats;
   activity?: ActivityDay[];
+  notes?: Note[];
 }
 
 export function buildBackupPayload(input: {
@@ -255,6 +257,7 @@ export function buildBackupPayload(input: {
   cards: VocabCard[];
   stats?: StudyStats;
   activity?: ActivityDay[];
+  notes?: Note[];
 }): FullBackupPayload {
   return {
     version: 1,
@@ -264,6 +267,7 @@ export function buildBackupPayload(input: {
     cards: input.cards,
     stats: input.stats,
     activity: input.activity,
+    notes: input.notes,
   };
 }
 
@@ -355,6 +359,16 @@ export function parseBackupJson(rawText: string): FullBackupPayload {
       )
     : undefined;
 
+  const notes = Array.isArray(source.notes)
+    ? (source.notes as unknown[]).filter(
+        (n): n is Note =>
+          !!n &&
+          typeof n === 'object' &&
+          typeof (n as Note).id === 'string' &&
+          typeof (n as Note).content === 'string'
+      )
+    : undefined;
+
   if (languages.length === 0 && decks.length === 0 && cards.length === 0) {
     throw new Error('No valid languages, decks, or cards found in this backup.');
   }
@@ -367,5 +381,6 @@ export function parseBackupJson(rawText: string): FullBackupPayload {
     cards,
     stats,
     activity,
+    notes,
   };
 }

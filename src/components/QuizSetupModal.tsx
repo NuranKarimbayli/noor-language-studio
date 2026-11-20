@@ -98,7 +98,7 @@ const MODE_OPTIONS: Array<{
 
 // Speaking practice is feature-flagged off until it ships — the engine code
 // remains in place but the mode is never selectable.
-const SPEAKING_PRACTICE_ENABLED = false;
+export const SPEAKING_PRACTICE_ENABLED = false;
 
 export function QuizSetupModal({
   open,

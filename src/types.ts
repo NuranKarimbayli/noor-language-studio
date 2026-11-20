@@ -16,6 +16,9 @@ export type SessionMode = 'flashcards' | QuizMode;
 
 export type AppStage = 'languages' | 'workspace';
 
+// Focused workspace views behind the sidebar navigation
+export type WorkspaceView = 'words' | 'quiz' | 'stats' | 'notes';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface LanguageItem {
@@ -135,6 +138,15 @@ export interface AppPrefs {
   autoSpeakAnswer: boolean; // speak the word/example again when the answer is revealed
   reminderEnabled: boolean; // browser Notification when reviews are due
   onboardingDismissed?: boolean; // first-run checklist hidden
+  notesAutoSave?: boolean; // auto-save the notepad while typing (default true)
+  notesAutoSaveSeconds?: number; // debounce interval for auto-save (1|2|5|10)
+}
+
+// Freeform study notepad, persisted in IndexedDB and included in backups
+export interface Note {
+  id: string;
+  content: string;
+  updatedAt: string; // ISO timestamp
 }
 
 // Completed study session persisted in IndexedDB (session history)

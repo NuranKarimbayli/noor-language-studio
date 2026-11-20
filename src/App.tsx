@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, AudioLines, CalendarClock, Keyboard, MicOff, Monitor, Moon, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlashcardStudy } from './components/FlashcardStudy';
 import { LanguageScreen } from './components/LanguageScreen';
+import { NotesPanel } from './components/NotesPanel';
+import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { OverviewStrip } from './components/OverviewStrip';
 import { ActivitySection } from './components/ActivitySection';
 import { QuizCenter } from './components/QuizCenter';
+import { QuizLauncher } from './components/QuizLauncher';
 import { QuizSetupModal } from './components/QuizSetupModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/Toast';
 import { PRESET_LANGUAGES, SEED_CARDS, SEED_DECKS } from './data/seedDecks';
 import {
@@ -21,10 +25,12 @@ import {
   Deck,
   DifficultyLevel,
   LanguageItem,
+  Note,
   QuizMode,
   QuizSessionSummary,
   SessionCompletionSummary,
   SessionConfig,
+  SessionMode,
   SessionRecord,
   SmartDeck,
   SmartDeckFilter,
@@ -32,6 +38,7 @@ import {
   ThemeMode,
   ToastMessage,
   VocabCard,
+  WorkspaceView,
 } from './types';
 import { cleanupAudioContext } from './utils/soundEffects';
 import { preloadVoices, stopSpeaking } from './utils/speechUtils';
@@ -72,6 +79,7 @@ import {
   getAllCards,
   getAllDecks,
   getAllLanguages,
+  getAllNotes,
   getAppPrefs,
   getSfxMuted,
   getSessionHistory,
@@ -83,6 +91,7 @@ import {
   markSeedCompleted,
   putActivityDay,
   putCards,
+  putNote,
   resetStudyProgress,
   saveAppPrefs,
   saveSfxMuted,
@@ -141,6 +150,13 @@ export default function App() {
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('words');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [quizSetupMode, setQuizSetupMode] = useState<SessionMode | undefined>(
+    undefined
+  );
   const toastTimeoutsRef = useRef<Set<number>>(new Set());
 
   // Initialize IndexedDB and load initial data
@@ -161,6 +177,7 @@ export default function App() {
           loadedPrefs,
           loadedSessions,
           loadedSmartDecks,
+          loadedNotes,
         ] = await Promise.all([
           getAllLanguages(),
           getAllDecks(),
@@ -173,6 +190,7 @@ export default function App() {
           getAppPrefs(),
           getSessionHistory(50),
           getSmartDecks(),
+          getAllNotes(),
         ]);
 
         setLanguages(loadedLanguages);
@@ -185,6 +203,7 @@ export default function App() {
         setActivity(loadedActivity);
         setSessions(loadedSessions);
         setSmartDecks(loadedSmartDecks);
+        setNotes(loadedNotes);
         setAppPrefs(loadedPrefs);
 
         setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
@@ -328,6 +347,23 @@ export default function App() {
     [activeLanguage]
   );
 
+  // Listening mode requires a usable native voice for this language
+  const voiceReady = useMemo(
+    () => !!activeVoice.name && activeVoice.disabled !== true,
+    [activeVoice]
+  );
+
+  // The note shown in the notepad — canonical 'main' note, else first note
+  const primaryNote = useMemo(
+    () => notes.find((n) => n.id === 'main') ?? notes[0] ?? null,
+    [notes]
+  );
+
+  const leechCount = useMemo(
+    () => languageCards.filter((c) => !c.suspended && isLeechCard(c)).length,
+    [languageCards]
+  );
+
   const notify = useCallback(
     (
       text: string,
@@ -444,6 +480,8 @@ export default function App() {
       setSelectedDeckId(firstDeckForLang?.id ?? '');
       setActiveSession(null);
       setQuizSetupOpen(false);
+      setQuizSetupMode(undefined);
+      setWorkspaceView('words');
       setStage('workspace');
     },
     [decks]
@@ -857,15 +895,42 @@ export default function App() {
     [activeLanguage.id, bumpActivity]
   );
 
-  const openQuizSetup = useCallback((deckId?: string) => {
+  const openQuizSetup = useCallback((deckId?: string, mode?: SessionMode) => {
     setSetupInitialDeckId(deckId);
+    setQuizSetupMode(mode);
     setQuizSetupOpen(true);
   }, []);
 
   const handleStartSession = useCallback((config: SessionConfig) => {
     setActiveSession(config);
     setQuizSetupOpen(false);
+    setQuizSetupMode(undefined);
   }, []);
+
+  // Persist the notepad draft — single canonical note ('main'), extra notes
+  // from imported backups are preserved untouched.
+  const handlePersistNote = useCallback(
+    async (content: string) => {
+      const existing = notes.find((n) => n.id === 'main') ?? notes[0] ?? null;
+      const noteId = existing?.id ?? 'main';
+      const updated: Note = {
+        id: noteId,
+        content,
+        updatedAt: new Date().toISOString(),
+      };
+      await putNote(updated);
+      setNotes((prev) => {
+        const idx = prev.findIndex((n) => n.id === noteId);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = updated;
+          return next;
+        }
+        return [...prev, updated];
+      });
+    },
+    [notes]
+  );
 
   // Persist a completed session into history (state + IndexedDB)
   const recordSession = useCallback(
@@ -1146,10 +1211,11 @@ export default function App() {
         cards,
         stats: studyStats,
         activity,
+        notes,
       })
     );
     notify('Backup exported as JSON', 'success');
-  }, [languages, decks, cards, studyStats, activity, notify]);
+  }, [languages, decks, cards, studyStats, activity, notes, notify]);
 
   const handleImportBackup = useCallback(
     async (rawText: string, mode: 'merge' | 'replace') => {
@@ -1161,6 +1227,7 @@ export default function App() {
           ...payload.languages.map((l) => addLanguage(l)),
           ...payload.decks.map((d) => addDeck(d)),
           putCards(payload.cards),
+          ...(payload.notes ?? []).map((n) => putNote(n)),
         ]);
         if (payload.stats) await saveStats(payload.stats);
         for (const day of payload.activity ?? []) {
@@ -1176,6 +1243,7 @@ export default function App() {
           setStudyStats((prev) => ({ ...prev, ...payload.stats }));
         }
         setActivity(payload.activity ?? []);
+        setNotes(payload.notes ?? []);
         setActiveSession(null);
         setQuizSetupOpen(false);
 
@@ -1194,6 +1262,7 @@ export default function App() {
           ...payload.languages.map((l) => addLanguage(l)),
           ...payload.decks.map((d) => addDeck(d)),
           putCards(payload.cards),
+          ...(payload.notes ?? []).map((n) => putNote(n)),
         ]);
         for (const day of payload.activity ?? []) {
           await putActivityDay(day);
@@ -1202,6 +1271,9 @@ export default function App() {
         setLanguages((prev) => mergeById(prev, payload.languages));
         setDecks((prev) => mergeById(prev, payload.decks));
         setCards((prev) => mergeById(prev, payload.cards));
+        if (payload.notes) {
+          setNotes((prev) => mergeById(prev, payload.notes ?? []));
+        }
         setActivity((prev) => {
           const incoming = payload.activity ?? [];
           const incomingDates = new Set(incoming.map((d) => d.date));
@@ -1387,47 +1459,36 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-3">
-            {/* Left: "← Languages" + Current Language Title + Subtle Brand */}
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-3">
+            {/* Left: nav toggle + current language (switch via sidebar/languages) */}
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Open navigation"
+                className="lg:hidden p-2 -ml-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((v) => !v)}
+                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className="hidden lg:inline-flex p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setActiveSession(null);
                   setStage('languages');
                 }}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors whitespace-nowrap shrink-0"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Languages</span>
-              </button>
-
-              <span className="text-slate-300 dark:text-[#2E2A25]" aria-hidden="true">
-                /
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setActiveSession(null)}
                 className="font-display text-base sm:text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EC] truncate text-left"
               >
                 {activeLanguage.name}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveSession(null);
-                  setStage('languages');
-                }}
-                className="hidden md:inline-flex items-center gap-1.5 text-xs text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] whitespace-nowrap shrink-0 pl-2"
-              >
-                <img
-                  src="/icon.png"
-                  alt=""
-                  className="w-4 h-4 rounded object-cover"
-                />
-                Noor Language Studio
               </button>
             </div>
 
@@ -1445,7 +1506,10 @@ export default function App() {
               <button
                 type="button"
                 disabled={languageCards.length === 0}
-                onClick={() => openQuizSetup(selectedDeckId || undefined)}
+                onClick={() => {
+                  setActiveSession(null);
+                  setWorkspaceView('quiz');
+                }}
                 className="px-4 py-1.5 sm:py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
               >
                 Start Quiz
@@ -1551,10 +1615,45 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12"
+              className="w-full"
             >
               {!activeSession && (
-                <div className="space-y-10">
+                <div className="flex">
+                  <Sidebar
+                    view={workspaceView}
+                    onViewChange={(v) => {
+                      setWorkspaceView(v);
+                      setMobileNavOpen(false);
+                    }}
+                    collapsed={sidebarCollapsed}
+                    onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+                    languageName={activeLanguage.name}
+                    onOpenLanguages={() => {
+                      setActiveSession(null);
+                      setStage('languages');
+                    }}
+                    dueCount={dueTodayCount}
+                  />
+                  <Sidebar
+                    mobile
+                    mobileOpen={mobileNavOpen}
+                    onCloseMobile={() => setMobileNavOpen(false)}
+                    view={workspaceView}
+                    onViewChange={(v) => {
+                      setWorkspaceView(v);
+                      setMobileNavOpen(false);
+                    }}
+                    collapsed={false}
+                    onToggleCollapse={() => {}}
+                    languageName={activeLanguage.name}
+                    onOpenLanguages={() => {
+                      setActiveSession(null);
+                      setStage('languages');
+                    }}
+                    dueCount={dueTodayCount}
+                  />
+                  <div className="flex-1 min-w-0 px-4 sm:px-6 py-8 sm:py-12">
+                    <div className="max-w-4xl mx-auto space-y-10">
                   {showDueBanner && (
                     <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -1583,29 +1682,19 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                  <OverviewStrip
-                    languageId={activeLanguage.id}
+                  <OnboardingChecklist
                     decks={languageDecks}
                     cards={languageCards}
                     stats={studyStats}
-                    onStartSmartReview={handleStartSmartReview}
-                    onboardingDismissed={appPrefs.onboardingDismissed ?? false}
-                    onDismissOnboarding={() =>
+                    dismissed={appPrefs.onboardingDismissed ?? false}
+                    onDismiss={() =>
                       setAppPrefs((prev) => ({ ...prev, onboardingDismissed: true }))
                     }
                   />
-                  <ActivitySection
-                    activity={activity}
-                    dailyGoal={studyStats.dailyGoal ?? 20}
-                    onDailyGoalChange={handleDailyGoalChange}
-                    cards={languageCards}
-                    deckNameFor={deckNameFor}
-                    onPracticeMistakes={handlePracticeMistakes}
-                    sessions={sessions}
-                    onStartLeechLab={handleStartLeechLab}
-                  />
-                  <ErrorBoundary>
-                    <DeckWorkspace
+
+                  {workspaceView === 'words' && (
+                    <ErrorBoundary>
+                      <DeckWorkspace
                       languageName={activeLanguage.name}
                       languageCode={activeLanguage.code}
                       decks={languageDecks}
@@ -1634,11 +1723,60 @@ export default function App() {
                       ttsMuted={ttsMuted}
                       voice={activeVoice}
                     />
-                  </ErrorBoundary>
+                    </ErrorBoundary>
+                  )}
+
+                  {workspaceView === 'quiz' && (
+                    <QuizLauncher
+                      hasCards={languageCards.length > 0}
+                      dueCount={dueTodayCount}
+                      leechCount={leechCount}
+                      voiceReady={voiceReady}
+                      onSmartReview={handleStartSmartReview}
+                      onDueReview={handleStartDueReview}
+                      onLeechLab={handleStartLeechLab}
+                      onOpenSetup={(mode) => openQuizSetup(undefined, mode)}
+                    />
+                  )}
+
+                  {workspaceView === 'stats' && (
+                    <>
+                      <OverviewStrip
+                        languageId={activeLanguage.id}
+                        decks={languageDecks}
+                        cards={languageCards}
+                        stats={studyStats}
+                        onStartSmartReview={handleStartSmartReview}
+                      />
+                      <ActivitySection
+                        activity={activity}
+                        dailyGoal={studyStats.dailyGoal ?? 20}
+                        onDailyGoalChange={handleDailyGoalChange}
+                        cards={languageCards}
+                        deckNameFor={deckNameFor}
+                        onPracticeMistakes={handlePracticeMistakes}
+                        sessions={sessions}
+                        onStartLeechLab={handleStartLeechLab}
+                      />
+                    </>
+                  )}
+
+                  {workspaceView === 'notes' && (
+                    <NotesPanel
+                      note={primaryNote}
+                      autoSave={appPrefs.notesAutoSave ?? true}
+                      intervalSeconds={appPrefs.notesAutoSaveSeconds ?? 2}
+                      onPersist={handlePersistNote}
+                    />
+                  )}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {activeSession && activeSession.mode === 'flashcards' && (
+              {activeSession && (
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+              {activeSession.mode === 'flashcards' && (
                 <ErrorBoundary>
                   <FlashcardStudy
                     decks={languageDecks}
@@ -1659,7 +1797,7 @@ export default function App() {
                 </ErrorBoundary>
               )}
 
-              {activeSession && activeSession.mode !== 'flashcards' && (
+              {activeSession.mode !== 'flashcards' && (
                 <ErrorBoundary>
                   <QuizCenter
                     languageCode={activeLanguage.code}
@@ -1681,6 +1819,8 @@ export default function App() {
                   />
                 </ErrorBoundary>
               )}
+                </div>
+              )}
             </motion.main>
           )}
         </AnimatePresence>
@@ -1694,9 +1834,12 @@ export default function App() {
         decks={languageDecks}
         cards={languageCards}
         initialDeckId={setupInitialDeckId}
-        initialMode={activeSession?.mode ?? 'multiple-choice'}
+        initialMode={quizSetupMode ?? activeSession?.mode ?? 'multiple-choice'}
         defaultTimerSeconds={appPrefs.defaultTimerSeconds}
-        onClose={() => setQuizSetupOpen(false)}
+        onClose={() => {
+          setQuizSetupOpen(false);
+          setQuizSetupMode(undefined);
+        }}
         onStartSession={handleStartSession}
       />
 
@@ -1736,6 +1879,14 @@ export default function App() {
         }
         reminderEnabled={appPrefs.reminderEnabled}
         onReminderChange={handleReminderEnabledChange}
+        notesAutoSave={appPrefs.notesAutoSave ?? true}
+        onNotesAutoSaveChange={(enabled) =>
+          setAppPrefs((prev) => ({ ...prev, notesAutoSave: enabled }))
+        }
+        notesAutoSaveSeconds={appPrefs.notesAutoSaveSeconds ?? 2}
+        onNotesAutoSaveSecondsChange={(seconds) =>
+          setAppPrefs((prev) => ({ ...prev, notesAutoSaveSeconds: seconds }))
+        }
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

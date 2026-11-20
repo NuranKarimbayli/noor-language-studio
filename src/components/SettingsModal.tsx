@@ -5,6 +5,7 @@ import {
   Keyboard,
   Monitor,
   Moon,
+  NotebookPen,
   RotateCcw,
   Sun,
   TriangleAlert,
@@ -37,6 +38,10 @@ interface SettingsModalProps {
   onAutoSpeakAnswerChange: (enabled: boolean) => void;
   reminderEnabled: boolean;
   onReminderChange: (enabled: boolean) => void;
+  notesAutoSave: boolean;
+  onNotesAutoSaveChange: (enabled: boolean) => void;
+  notesAutoSaveSeconds: number;
+  onNotesAutoSaveSecondsChange: (seconds: number) => void;
 }
 
 function Toggle({
@@ -102,6 +107,7 @@ function Section({
 }
 
 const TIMER_OPTIONS = [0, 10, 15, 20, 30];
+const NOTES_INTERVAL_OPTIONS = [1, 2, 5, 10];
 
 export function SettingsModal({
   open,
@@ -126,6 +132,10 @@ export function SettingsModal({
   onAutoSpeakAnswerChange,
   reminderEnabled,
   onReminderChange,
+  notesAutoSave,
+  onNotesAutoSaveChange,
+  notesAutoSaveSeconds,
+  onNotesAutoSaveSecondsChange,
 }: SettingsModalProps) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -290,6 +300,42 @@ export function SettingsModal({
               it per session.
             </p>
           </div>
+        </Section>
+
+        {/* Notes */}
+        <Section icon={NotebookPen} title="Notes">
+          <Toggle
+            checked={notesAutoSave}
+            onChange={onNotesAutoSaveChange}
+            label="Auto-save notes"
+            description="Automatically persist your notepad while you type. When off, use the Save button."
+          />
+          {notesAutoSave && (
+            <div className="py-3 space-y-2">
+              <div className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
+                Auto-save interval
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {NOTES_INTERVAL_OPTIONS.map((sec) => (
+                  <button
+                    key={sec}
+                    type="button"
+                    onClick={() => onNotesAutoSaveSecondsChange(sec)}
+                    className={`py-1.5 rounded-lg text-xs font-mono font-medium border transition-colors ${
+                      notesAutoSaveSeconds === sec
+                        ? 'border-[#B45309] dark:border-[#D97706] bg-[#B45309] text-white'
+                        : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
+                    }`}
+                  >
+                    {sec}s
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
+                How often unsaved changes are written while you type.
+              </p>
+            </div>
+          )}
         </Section>
 
         {/* Danger Zone */}
