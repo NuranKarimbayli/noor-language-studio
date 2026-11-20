@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, DatabaseBackup, Download, FileUp, MicOff, Pencil, Pin, PinOff, Play, Plus, Trash2, Upload, Volume2, X } from 'lucide-react';
+import { ArrowRight, DatabaseBackup, Download, FileUp, MicOff, Pencil, Pin, PinOff, Play, Plus, Trash2, Upload, Volume2, X } from 'lucide-react';
 import { Deck, LanguageItem, VocabCard } from '../types';
 import {
   findVoiceForLanguage,
@@ -16,7 +16,6 @@ interface LanguageScreenProps {
   languages: LanguageItem[];
   decks: Deck[];
   cards: VocabCard[];
-  onBack: () => void;
   onSelectLanguage: (languageId: string) => void;
   onAddCustomLanguage: (data: {
     name: string;
@@ -47,7 +46,6 @@ export function LanguageScreen({
   languages,
   decks,
   cards,
-  onBack,
   onSelectLanguage,
   onAddCustomLanguage,
   onUpdateLanguage,
@@ -285,15 +283,6 @@ export function LanguageScreen({
   return (
     <div className="max-w-4xl mx-auto py-6 sm:py-12 space-y-8">
       <div className="space-y-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 px-3 py-1.5 -ml-3 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#1C1A17] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
-
         <div className="space-y-1.5">
           <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC]">
             Select a Language

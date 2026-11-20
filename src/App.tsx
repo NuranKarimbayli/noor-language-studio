@@ -1533,7 +1533,6 @@ export default function App() {
                   languages={languages}
                   decks={decks}
                   cards={cards}
-                  onBack={() => setStage('workspace')}
                   onSelectLanguage={handleEnterLanguage}
                   onAddCustomLanguage={handleAddCustomLanguage}
                   onUpdateLanguage={handleUpdateLanguage}
