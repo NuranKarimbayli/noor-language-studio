@@ -16,7 +16,7 @@ interface LanguageScreenProps {
   languages: LanguageItem[];
   decks: Deck[];
   cards: VocabCard[];
-  onBackToCategories: () => void;
+  onBack: () => void;
   onSelectLanguage: (languageId: string) => void;
   onAddCustomLanguage: (data: {
     name: string;
@@ -47,7 +47,7 @@ export function LanguageScreen({
   languages,
   decks,
   cards,
-  onBackToCategories,
+  onBack,
   onSelectLanguage,
   onAddCustomLanguage,
   onUpdateLanguage,
@@ -287,11 +287,11 @@ export function LanguageScreen({
       <div className="space-y-4">
         <button
           type="button"
-          onClick={onBackToCategories}
+          onClick={onBack}
           className="inline-flex items-center gap-2 px-3 py-1.5 -ml-3 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#1C1A17] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Categories
+          Back
         </button>
 
         <div className="space-y-1.5">

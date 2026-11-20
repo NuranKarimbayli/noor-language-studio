@@ -14,7 +14,7 @@ export type QuizMode =
 
 export type SessionMode = 'flashcards' | QuizMode;
 
-export type AppStage = 'categories' | 'languages' | 'workspace';
+export type AppStage = 'languages' | 'workspace';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 

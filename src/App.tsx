@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, AudioLines, CalendarClock, Keyboard, MicOff, Monitor, Moon, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
-import { CategoryScreen } from './components/CategoryScreen';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlashcardStudy } from './components/FlashcardStudy';
@@ -113,7 +112,7 @@ export default function App() {
     bestQuizStreak: 0,
   });
 
-  const [stage, setStage] = useState<AppStage>('categories');
+  const [stage, setStage] = useState<AppStage>('workspace');
   const [activeLanguageId, setActiveLanguageId] = useState<string>('');
   const [selectedDeckId, setSelectedDeckId] = useState<string>('');
 
@@ -1305,7 +1304,7 @@ export default function App() {
           <div className="max-w-4xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={() => setStage('categories')}
+              onClick={() => setStage('workspace')}
               className="font-display text-lg font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC] whitespace-nowrap shrink-0 inline-flex items-center gap-2"
             >
               <img
@@ -1419,7 +1418,7 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   setActiveSession(null);
-                  setStage('categories');
+                  setStage('languages');
                 }}
                 className="hidden md:inline-flex items-center gap-1.5 text-xs text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] whitespace-nowrap shrink-0 pl-2"
               >
@@ -1520,23 +1519,6 @@ export default function App() {
       {/* Single Centered Container */}
       <div className="flex-1 w-full">
         <AnimatePresence mode="wait">
-          {stage === 'categories' && (
-            <motion.main
-              key="stage-categories"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12"
-            >
-              <CategoryScreen
-                languageCount={languages.length}
-                totalWordCount={cards.length}
-                onSelectLanguages={() => setStage('languages')}
-              />
-            </motion.main>
-          )}
-
           {stage === 'languages' && (
             <motion.main
               key="stage-languages"
@@ -1551,7 +1533,7 @@ export default function App() {
                   languages={languages}
                   decks={decks}
                   cards={cards}
-                  onBackToCategories={() => setStage('categories')}
+                  onBack={() => setStage('workspace')}
                   onSelectLanguage={handleEnterLanguage}
                   onAddCustomLanguage={handleAddCustomLanguage}
                   onUpdateLanguage={handleUpdateLanguage}
