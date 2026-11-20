@@ -277,7 +277,7 @@ export function QuizSetupModal({
       open={open}
       onClose={onClose}
       ariaLabel="Study and Quiz Setup"
-      panelClassName="max-w-2xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto space-y-6"
+      panelClassName="max-w-2xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto space-y-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]"
     >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200 dark:border-[#2E2A25]">
@@ -409,7 +409,7 @@ export function QuizSetupModal({
               No decks in {languageName} yet. Add words first.
             </p>
           ) : (
-            <div className="max-h-40 overflow-y-auto divide-y divide-slate-200 dark:divide-[#2E2A25] border border-slate-200 dark:border-[#2E2A25] rounded-xl">
+            <div className="max-h-40 overflow-y-auto divide-y divide-slate-200 dark:divide-[#2E2A25] border border-slate-200 dark:border-[#2E2A25] rounded-xl [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]">
               {decks.map((deck) => {
                 const count = cards.filter((c) => c.deckId === deck.id).length;
                 const checked = selectedDeckIds.includes(deck.id);

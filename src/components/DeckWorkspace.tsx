@@ -1620,7 +1620,7 @@ export function DeckWorkspace({
       <Modal
         open={modalState.type !== 'none'}
         onClose={() => setModal({ type: 'none' })}
-        panelClassName="max-w-lg p-6 max-h-[90vh] overflow-y-auto"
+        panelClassName="max-w-lg p-6 max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]"
       >
             {(modal.type === 'create-deck' || modal.type === 'edit-deck') && (
               <form onSubmit={handleDeckSubmit} className="space-y-4">
