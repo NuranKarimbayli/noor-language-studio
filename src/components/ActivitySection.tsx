@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Bug, Flame, History, Minus, Plus, Target, TrendingUp } from 'lucide-react';
 import { ActivityDay, SessionMode, SessionRecord, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
@@ -131,8 +131,174 @@ interface HeatCell {
   date: string;
   value: number;
   reviews: number;
+  quizzes: number;
   added: number;
 }
+
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
+
+function parseHeatDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatHeatDate(dateStr: string): string {
+  return parseHeatDate(dateStr).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+interface TooltipState {
+  cell: HeatCell;
+  x: number;
+  y: number;
+  below: boolean;
+}
+
+const TOOLTIP_W = 190;
+const TOOLTIP_H = 64;
+
+function showTooltipFor(
+  cell: HeatCell,
+  el: HTMLElement,
+  setTip: (t: TooltipState | null) => void
+) {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const x = Math.min(
+    Math.max(cx - TOOLTIP_W / 2, 8),
+    window.innerWidth - TOOLTIP_W - 8
+  );
+  const aboveY = rect.top - TOOLTIP_H - 8;
+  const below = aboveY < 8;
+  const y = below ? rect.bottom + 8 : aboveY;
+  setTip({ cell, x, y: Math.max(y, 8), below });
+}
+
+/** Memoized GitHub-style contribution grid: month labels + rich tooltips. */
+const ActivityHeatmap = memo(function ActivityHeatmap({
+  cells,
+}: {
+  cells: (HeatCell | null)[];
+}) {
+  const [tip, setTip] = useState<TooltipState | null>(null);
+
+  // Chunk flat day cells into week columns (grid-flow-col already renders
+  // column-major, so index w*7..w*7+6 is week w)
+  const weeks: (HeatCell | null)[][] = [];
+  for (let w = 0; w * 7 < cells.length; w++) {
+    weeks.push(cells.slice(w * 7, w * 7 + 7));
+  }
+
+  // Month label for each week column: shown when the month's first day
+  // appears in (or starts) that column, GitHub-style
+  const monthLabels = weeks.map((week) => {
+    const firstDay = week.find((c) => c !== null);
+    if (!firstDay) return null;
+    const d = parseHeatDate(firstDay.date);
+    // Label the column containing the 1st of a month, else the column where
+    // the month changes vs the previous week
+    const hasMonthStart = week.some((c) => {
+      if (!c) return false;
+      const cd = parseHeatDate(c.date);
+      return cd.getDate() === 1;
+    });
+    if (hasMonthStart) return MONTH_LABELS[d.getMonth()];
+    return null;
+  });
+
+  // Fallback: if no week got a label (edge case), label the first column
+  const anyLabel = monthLabels.some(Boolean);
+  if (!anyLabel && weeks.length > 0) {
+    const first = weeks[0].find((c) => c !== null);
+    if (first) monthLabels[0] = MONTH_LABELS[parseHeatDate(first.date).getMonth()];
+  }
+
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="w-max">
+        {/* Month labels aligned to week columns */}
+        <div className="flex gap-1 mb-1.5" aria-hidden="true">
+          {weeks.map((_, wi) => (
+            <div
+              key={wi}
+              className="w-3 sm:w-3.5 shrink-0 relative h-3.5 overflow-visible"
+            >
+              {monthLabels[wi] && (
+                <span className="absolute left-0 top-0 text-[10px] leading-3.5 font-medium text-[#78716C] dark:text-[#A8A29E] whitespace-nowrap">
+                  {monthLabels[wi]}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-flow-col grid-rows-7 gap-1 w-max">
+          {cells.map((cell, idx) =>
+            cell ? (
+              <div
+                key={cell.date}
+                tabIndex={0}
+                role="img"
+                aria-label={`${formatHeatDate(cell.date)}: ${
+                  cell.value > 0
+                    ? `${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}${cell.quizzes > 0 ? `, ${cell.quizzes} ${cell.quizzes === 1 ? 'quiz' : 'quizzes'}` : ''}${cell.added > 0 ? `, ${cell.added} new ${cell.added === 1 ? 'word' : 'words'}` : ''}`
+                    : 'No practice recorded'
+                }`}
+                onMouseEnter={(e) => showTooltipFor(cell, e.currentTarget, setTip)}
+                onMouseLeave={() => setTip(null)}
+                onFocus={(e) => showTooltipFor(cell, e.currentTarget, setTip)}
+                onBlur={() => setTip(null)}
+                className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-[3px] transition-colors cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309] dark:focus-visible:ring-[#D97706] ${LEVEL_CLASSES[intensityLevel(cell.value)]}`}
+              />
+            ) : (
+              <div key={`pad-${idx}`} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            )
+          )}
+        </div>
+      </div>
+
+      {/* Floating tooltip — position:fixed escapes the overflow-x-auto clip */}
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: tip.x,
+            top: tip.y,
+            width: TOOLTIP_W,
+            transform: tip.below ? 'translateY(0)' : 'translateY(-100%)',
+          }}
+        >
+          <div className="rounded-lg bg-[#1C1917] dark:bg-[#F5F2EC] text-[#FAF8F5] dark:text-[#1C1917] px-3 py-2 shadow-lg border border-[#2E2A25] dark:border-[#D6D0C6]">
+            <div className="text-xs font-semibold tabular-nums">
+              {formatHeatDate(tip.cell.date)}
+            </div>
+            <div className="text-[11px] text-[#D6D0C6] dark:text-[#57534E] mt-0.5 tabular-nums">
+              {tip.cell.value > 0 ? (
+                <>
+                  <span className="font-medium text-[#FAF8F5] dark:text-[#1C1917]">
+                    {tip.cell.value}
+                  </span>{' '}
+                  practice {tip.cell.value === 1 ? 'action' : 'actions'}
+                  {tip.cell.reviews > 0 && ` · ${tip.cell.reviews} ${tip.cell.reviews === 1 ? 'review' : 'reviews'}`}
+                  {tip.cell.quizzes > 0 && ` · ${tip.cell.quizzes} ${tip.cell.quizzes === 1 ? 'quiz' : 'quizzes'}`}
+                  {tip.cell.added > 0 && ` · ${tip.cell.added} new ${tip.cell.added === 1 ? 'word' : 'words'}`}
+                </>
+              ) : (
+                'No practice recorded'
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export function ActivitySection({
   activity,
@@ -167,6 +333,7 @@ export function ActivitySection({
         date: dateStr,
         value: dayActivityValue(rec),
         reviews: rec?.reviews ?? 0,
+        quizzes: rec?.quizzes ?? 0,
         added: rec?.cardsAdded ?? 0,
       });
       cursor.setDate(cursor.getDate() + 1);
@@ -238,21 +405,7 @@ export function ActivitySection({
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-1">
-          <div className="grid grid-flow-col grid-rows-7 gap-1 w-max">
-            {heatmapCells.map((cell, idx) =>
-              cell ? (
-                <div
-                  key={cell.date}
-                  title={`${cell.date} — ${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}${cell.added > 0 ? ` · ${cell.added} new ${cell.added === 1 ? 'word' : 'words'}` : ''}`}
-                  className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-[3px] transition-colors ${LEVEL_CLASSES[intensityLevel(cell.value)]}`}
-                />
-              ) : (
-                <div key={`pad-${idx}`} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              )
-            )}
-          </div>
-        </div>
+        <ActivityHeatmap cells={heatmapCells} />
 
         {/* Daily Review Goal */}
         <div className="pt-4 border-t border-slate-200 dark:border-[#2E2A25] space-y-2.5">
