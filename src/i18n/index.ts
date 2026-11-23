@@ -1,4 +1,4 @@
-import { RU } from './ru';
+import { RU, RU_PLURALS } from './ru';
 
 export type UiLanguage = 'en' | 'ru';
 
@@ -36,4 +36,28 @@ export function t(
     }
   }
   return out;
+}
+
+/**
+ * Localized plural noun form. English picks singular/plural; Russian uses
+ * the one/few/many rule (1 слово, 3 слова, 5 слов, 11 слов, 21 слово).
+ * `plural` is the English plural form (defaults to singular + 's').
+ */
+export function pluralize(
+  count: number,
+  singular: string,
+  plural?: string
+): string {
+  const enPlural = plural ?? `${singular}s`;
+  if (currentLang !== 'ru') {
+    return count === 1 ? singular : enPlural;
+  }
+  const forms = RU_PLURALS[singular];
+  if (!forms) return count === 1 ? singular : enPlural;
+  const n = Math.abs(count) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return forms[2];
+  if (n1 > 1 && n1 < 5) return forms[1];
+  if (n1 === 1) return forms[0];
+  return forms[2];
 }

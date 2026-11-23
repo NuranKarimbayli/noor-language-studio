@@ -1336,7 +1336,7 @@ export function QuizCenter({
                   >
                     {currentQuestion.promptText}
                   </p>
-                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">means</div>
+                  <div className="text-xs text-[#78716C] dark:text-[#A8A29E]">{t('means')}</div>
                   <p
                     className={`${
                       !isForeignPrompt ? 'font-display text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'
@@ -1471,11 +1471,11 @@ export function QuizCenter({
                   )}
                   {!currentRecord && (
                     <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                      Press{' '}
+                      {t('Press')}{' '}
                       <kbd className="font-mono px-1.5 py-0.5 rounded bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC]">
                         R
                       </kbd>{' '}
-                      to replay the word
+                      {t('to replay the word')}
                     </p>
                   )}
                 </div>
@@ -1500,16 +1500,16 @@ export function QuizCenter({
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
                       {currentRecord
-                        ? `You heard: ${currentQuestion.promptText}`
+                        ? t('You heard: {text}', { text: currentQuestion.promptText })
                         : t('Listen carefully — what does this word mean?')}
                     </p>
                     {!currentRecord && (
                       <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                        Press{' '}
+                        {t('Press')}{' '}
                         <kbd className="font-mono px-1.5 py-0.5 rounded bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC]">
                           R
                         </kbd>{' '}
-                        to replay
+                        {t('to replay')}
                       </p>
                     )}
                   </div>

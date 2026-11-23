@@ -11,7 +11,7 @@ import {
 } from '../utils/speechUtils';
 import { parseBackupJson } from '../utils/storage';
 import { Modal } from './Modal';
-import { t } from '../i18n';
+import { pluralize, t } from '../i18n';
 
 interface LanguageScreenProps {
   languages: LanguageItem[];
@@ -355,8 +355,8 @@ export function LanguageScreen({
                       e.stopPropagation();
                       openEditModal(lang);
                     }}
-                    aria-label={`Edit ${lang.name}`}
-                    title={`Edit ${lang.name}`}
+                    aria-label={t('Edit {name}', { name: lang.name })}
+                    title={t('Edit {name}', { name: lang.name })}
                     className="p-1.5 rounded-md text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -367,8 +367,8 @@ export function LanguageScreen({
                       e.stopPropagation();
                       setConfirmDelete(lang);
                     }}
-                    aria-label={`Delete ${lang.name}`}
-                    title={`Delete ${lang.name}`}
+                    aria-label={t('Delete {name}', { name: lang.name })}
+                    title={t('Delete {name}', { name: lang.name })}
                     className="p-1.5 rounded-md text-[#A8A29E] hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -405,7 +405,7 @@ export function LanguageScreen({
                   ) : lang.voiceName ? (
                     <span
                       className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400"
-                      title={`Using voice: ${lang.voiceName}`}
+                      title={t('Using voice: {voice}', { voice: lang.voiceName })}
                     >
                       <Volume2 className="w-3 h-3" />
                       {t('Voice set')}
@@ -450,9 +450,7 @@ export function LanguageScreen({
                 Data &amp; Backup
               </h2>
               <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
-                Your progress lives only in this browser. Export a full backup of
-                all languages, decks, words, stats, and activity — then restore it
-                here on this or another device.
+                {t('Your progress lives only in this browser. Export a full backup of all languages, decks, words, stats, and activity — then restore it here on this or another device.')}
               </p>
             </div>
           </div>
@@ -572,7 +570,7 @@ export function LanguageScreen({
                     className="flex-1 min-w-0 px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   >
                   <option value="auto">{t('Auto-detect best match')}</option>
-                  <option value="none">None / Disable Voice</option>
+                  <option value="none">{t('None / Disable Voice')}</option>
                   {voiceGroups.map(([tag, voices]) => (
                     <optgroup
                       key={tag}
@@ -669,15 +667,16 @@ export function LanguageScreen({
           <>
             <div className="space-y-1.5">
               <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                Delete {lastConfirmDelete.current.name}?
+                {t('Delete {name}', { name: lastConfirmDelete.current.name })}?
               </h2>
               <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                This permanently removes the language along with its{' '}
-                {decks.filter((d) => d.languageId === lastConfirmDelete.current!.id).length}{' '}
-                {decks.filter((d) => d.languageId === lastConfirmDelete.current!.id).length === 1
-                  ? 'deck'
-                  : 'decks'}{' '}
-                and all associated words. This cannot be undone.
+                {(() => {
+                  const n = decks.filter((d) => d.languageId === lastConfirmDelete.current!.id).length;
+                  return t('This permanently removes the language along with its {count} {decks} and all associated words. This cannot be undone.', {
+                    count: n,
+                    decks: pluralize(n, 'deck', 'decks'),
+                  });
+                })()}
               </p>
             </div>
             <div className="flex items-center justify-end gap-2.5 pt-1">
@@ -708,7 +707,7 @@ export function LanguageScreen({
       <Modal
         open={importState !== null}
         onClose={() => !importing && setImportState(null)}
-        ariaLabel="Restore backup"
+        ariaLabel={t('Restore backup')}
         panelClassName="max-w-md p-6 space-y-4"
       >
         {importState?.status === 'error' ? (
@@ -758,8 +757,7 @@ export function LanguageScreen({
                   {t('Merge into current data')}
                 </span>
                 <span className="block text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
-                  Add backup records alongside existing ones. Matching IDs are
-                  updated; nothing is deleted.
+                  {t('Add backup records alongside existing ones. Matching IDs are updated; nothing is deleted.')}
                 </span>
               </button>
               <button
@@ -772,8 +770,7 @@ export function LanguageScreen({
                   {t('Replace all current data')}
                 </span>
                 <span className="block text-xs text-red-700/80 dark:text-red-300/70 mt-0.5 leading-relaxed">
-                  Permanently clear this workspace, then restore the backup.
-                  Export a backup first if unsure.
+                  {t('Permanently clear this workspace, then restore the backup. Export a backup first if unsure.')}
                 </span>
               </button>
             </div>

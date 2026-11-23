@@ -169,7 +169,7 @@ export function SettingsModal({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="Settings"
+      ariaLabel={t('Settings')}
       panelClassName="max-w-md flex flex-col max-h-[85vh] overflow-hidden"
     >
       <div className="shrink-0 flex items-start justify-between gap-4 px-6 pt-6 pb-4 border-b border-slate-200 dark:border-[#2E2A25]">
@@ -263,7 +263,7 @@ export function SettingsModal({
             checked={reminderEnabled}
             onChange={onReminderChange}
             label={t('Review reminders')}
-            description="Browser notification (once a day) when cards are due for review. Requires notification permission."
+            description={t('Browser notification (once a day) when cards are due for review. Requires notification permission.')}
           />
         </Section>
 
@@ -273,7 +273,7 @@ export function SettingsModal({
             checked={soundEffectsEnabled}
             onChange={onSoundEffectsChange}
             label={t('Sound effects')}
-            description="Correct/incorrect chimes and quiz completion sounds."
+            description={t('Correct/incorrect chimes and quiz completion sounds.')}
           />
           <Toggle
             checked={speechEnabled}
@@ -324,8 +324,7 @@ export function SettingsModal({
               ))}
             </div>
             <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
-              Pre-selects a timer when opening quiz setup. You can still change
-              it per session.
+              {t('Pre-selects a timer when opening quiz setup. You can still change it per session.')}
             </p>
           </div>
         </Section>
@@ -375,8 +374,7 @@ export function SettingsModal({
                   {t('Install Noor Language Studio')}
                 </div>
                 <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
-                  Add to your home screen or desktop for offline access and
-                  a dedicated window.
+                  {t('Add to your home screen or desktop for offline access and a dedicated window.')}
                 </p>
               </div>
               <button
@@ -398,9 +396,7 @@ export function SettingsModal({
                 {t('Reset statistics')}
               </div>
               <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
-                Permanently erase study streaks, quiz totals, daily activity
-                history, and every card&apos;s review progress. Your languages,
-                decks, and words are kept.
+                {t('Permanently erase study streaks, quiz totals, daily activity history, and every card\'s review progress. Your languages, decks, and words are kept.')}
               </p>
             </div>
             <button
@@ -439,7 +435,7 @@ export function SettingsModal({
         setConfirmResetOpen(false);
         setConfirmText('');
       }}
-      ariaLabel="Confirm reset statistics"
+      ariaLabel={t('Confirm reset statistics')}
       panelClassName="max-w-sm"
     >
       <div className="p-6 space-y-4">
@@ -452,19 +448,18 @@ export function SettingsModal({
               {t('Reset all study statistics?')}
             </h3>
             <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-1 leading-relaxed">
-              This action is <strong className="text-red-700 dark:text-red-400">{t('permanent, irreversible, and cannot be undone')}</strong>.
-              It will erase:
+              This action is <strong className="text-red-700 dark:text-red-400">{t('permanent, irreversible, and cannot be undone')}</strong>.{' '}
+              {t('It will erase:')}
             </p>
           </div>
         </div>
         <ul className="text-xs text-[#57534E] dark:text-[#A8A29E] space-y-1.5 pl-1 list-disc list-inside">
           <li>{t('Study streaks, quiz totals, and best streak')}</li>
           <li>{t('Daily activity history and review forecast')}</li>
-          <li>Every card&apos;s SRS box, due dates, lapses, and review counts</li>
+          <li>{t('Every card\'s SRS box, due dates, lapses, and review counts')}</li>
         </ul>
         <p className="text-xs text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
-          Your languages, decks, words, difficulty ratings, and settings are{' '}
-          <strong>not</strong> affected.
+          {t('Your languages, decks, words, difficulty ratings, and settings are not affected.')}
         </p>
         {(() => {
           const days = lastBackupAt
@@ -475,8 +470,7 @@ export function SettingsModal({
             <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed flex items-start gap-1.5">
               <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
-                Your last backup was {days} days ago — consider exporting one
-                from Statistics before resetting.
+                {t('Your last backup was {days} days ago — consider exporting one from Statistics before resetting.', { days })}
               </span>
             </p>
           );
@@ -486,8 +480,8 @@ export function SettingsModal({
             htmlFor="reset-confirm-input"
             className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5"
           >
-            Type <kbd className="font-mono px-1 rounded bg-[#F3EFE8] dark:bg-[#25221E]">{t('RESET')}</kbd> to
-            confirm
+            {t('Type')} <kbd className="font-mono px-1 rounded bg-[#F3EFE8] dark:bg-[#25221E]">{t('RESET')}</kbd>{' '}
+            {t('to confirm')}
           </label>
           <input
             id="reset-confirm-input"

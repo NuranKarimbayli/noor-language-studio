@@ -5,6 +5,26 @@ import { AnimatePresence, motion } from 'motion/react';
 // so nested confirmations (e.g. reset statistics) dismiss before their parent.
 const openModalStack: symbol[] = [];
 
+// Reference-counted body scroll lock: nested modals each acquire/release,
+// and the page only scrolls again once the last one closes.
+let scrollLockCount = 0;
+
+function acquireScrollLock() {
+  scrollLockCount += 1;
+  if (scrollLockCount === 1) {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function releaseScrollLock() {
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if (scrollLockCount === 0) {
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  }
+}
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -31,6 +51,7 @@ export function Modal({
     if (!open) return;
     const id = stackIdRef.current!;
     openModalStack.push(id);
+    acquireScrollLock();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if (openModalStack[openModalStack.length - 1] !== id) return;
@@ -40,6 +61,7 @@ export function Modal({
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      releaseScrollLock();
       const i = openModalStack.indexOf(id);
       if (i !== -1) openModalStack.splice(i, 1);
     };
@@ -49,7 +71,7 @@ export function Modal({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex overflow-y-auto bg-black/50 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex overflow-y-auto overscroll-contain bg-black/50 backdrop-blur-[2px]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

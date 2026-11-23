@@ -28,7 +28,7 @@ import { DiacriticBar } from './DiacriticBar';
 import { Modal } from './Modal';
 import { SpeakButton } from './SpeakButton';
 import { VoiceSelection } from '../utils/speechUtils';
-import { t } from '../i18n';
+import { pluralize, t } from '../i18n';
 
 interface DeckWorkspaceProps {
   languageName: string;
@@ -138,9 +138,9 @@ const SMART_FILTER_OPTIONS: Array<{ key: keyof SmartDeckFilter; label: string; h
 ];
 
 function smartFilterSummary(filter: SmartDeckFilter): string {
-  const parts = SMART_FILTER_OPTIONS.filter((o) => filter[o.key]).map((o) => o.label.toLowerCase());
-  if (filter.tag?.trim()) parts.push(`tag: ${filter.tag.trim()}`);
-  return parts.length > 0 ? parts.join(' + ') : 'no filters';
+  const parts = SMART_FILTER_OPTIONS.filter((o) => filter[o.key]).map((o) => t(o.label).toLowerCase());
+  if (filter.tag?.trim()) parts.push(`${t('tag')}: ${filter.tag.trim()}`);
+  return parts.length > 0 ? parts.join(' + ') : t('no filters');
 }
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyLevel; label: string }> = [
@@ -593,13 +593,13 @@ export function DeckWorkspace({
           description: deckDescription.trim(),
         });
         onSelectDeck(created.id);
-        onNotify(`Created deck "${created.name}"`, 'success');
+        onNotify(t('Created deck "{name}"', { name: created.name }), 'success');
       } else if (modal.type === 'edit-deck') {
         await onUpdateDeck(modal.deck.id, {
           name: trimmedName,
           description: deckDescription.trim(),
         });
-        onNotify(`Updated deck "${trimmedName}"`, 'success');
+        onNotify(t('Updated deck "{name}"', { name: trimmedName }), 'success');
       }
       setModal({ type: 'none' });
     } catch {
@@ -636,7 +636,7 @@ export function DeckWorkspace({
           mnemonic,
           tags,
         });
-        onNotify(`Updated "${word}"`, 'success');
+        onNotify(t('Updated "{word}"', { word }), 'success');
       } else {
         const target = await ensureTargetDeck();
         await onAddCard(target.id, {
@@ -647,7 +647,7 @@ export function DeckWorkspace({
           mnemonic,
           tags,
         });
-        onNotify(`Added "${word}"`, 'success');
+        onNotify(t('Added "{word}"', { word }), 'success');
       }
       setModal({ type: 'none' });
     } catch {
@@ -662,7 +662,11 @@ export function DeckWorkspace({
       const target = await ensureTargetDeck();
       await onBulkAddCards(target.id, bulkParsed.items, bulkDifficulty);
       onNotify(
-        `Imported ${bulkParsed.items.length} ${bulkParsed.items.length === 1 ? 'word' : 'words'} into "${target.name}"`,
+        t('Imported {count} {words} into "{name}"', {
+          count: bulkParsed.items.length,
+          words: pluralize(bulkParsed.items.length, 'word', 'words'),
+          name: target.name,
+        }),
         'success'
       );
       setModal({ type: 'none' });
@@ -939,7 +943,7 @@ export function DeckWorkspace({
                   </p>
                   <div className="mt-3 flex items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
                     <span>
-                      {count} {count === 1 ? 'word' : 'words'} now
+                      {count} {pluralize(count, 'word', 'words')} {t('now')}
                     </span>
                   </div>
                 </div>
@@ -978,7 +982,7 @@ export function DeckWorkspace({
                     <div className="relative shrink-0">
                       <button
                         type="button"
-                        aria-label={`More actions for ${deck.name}`}
+                        aria-label={t('More actions for {name}', { name: deck.name })}
                         onClick={(e) => {
                           e.stopPropagation();
                           setHeaderMenuOpen(false);
@@ -1032,7 +1036,7 @@ export function DeckWorkspace({
                               setOpenDeckMenuId(null);
                               const dCards = cards.filter((c) => c.deckId === deck.id);
                               exportDeckAsJson(deck, dCards);
-                              onNotify(`Exported "${deck.name}" as JSON`, 'success');
+                              onNotify(t('Exported "{name}" as JSON', { name: deck.name }), 'success');
                             }}
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                           >
@@ -1045,7 +1049,7 @@ export function DeckWorkspace({
                               setOpenDeckMenuId(null);
                               const dCards = cards.filter((c) => c.deckId === deck.id);
                               exportDeckAsCsv(deck, dCards);
-                              onNotify(`Exported "${deck.name}" as CSV`, 'success');
+                              onNotify(t('Exported "{name}" as CSV', { name: deck.name }), 'success');
                             }}
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                           >
@@ -1071,7 +1075,7 @@ export function DeckWorkspace({
 
                   <div className="mt-3 flex items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums">
                     <span>
-                      {count} {count === 1 ? 'word' : 'words'}
+                      {count} {pluralize(count, 'word', 'words')}
                     </span>
                     {dueCount > 0 && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] font-medium">
@@ -1081,7 +1085,7 @@ export function DeckWorkspace({
                     {mastery && count > 0 && (
                       <span
                         className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-medium"
-                        title={`${mastery.mastered} mastered · ${mastery.learning} learning · ${mastery.fresh} new`}
+                        title={t('{mastered} mastered · {learning} learning · {fresh} new', { mastered: mastery.mastered, learning: mastery.learning, fresh: mastery.fresh })}
                       >
                         {mastery.masteryPct}%
                       </span>
@@ -1116,7 +1120,7 @@ export function DeckWorkspace({
                   {' '}Membership updates automatically as your SRS state changes.
                 </p>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums pt-0.5">
-                  <span>{stats.total} {stats.total === 1 ? 'word' : 'words'} now</span>
+                  <span>{stats.total} {pluralize(stats.total, 'word', 'words')} {t('now')}</span>
                   <span aria-hidden="true">·</span>
                   <span>{stats.easy} easy</span>
                   <span aria-hidden="true">·</span>
@@ -1141,7 +1145,7 @@ export function DeckWorkspace({
                 <button
                   type="button"
                   onClick={() => setModal({ type: 'delete-smart-deck', smartDeck: activeSmartDeck })}
-                  aria-label={`Delete smart deck ${activeSmartDeck.name}`}
+                  aria-label={t('Delete smart deck {name}', { name: activeSmartDeck.name })}
                   className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -1160,7 +1164,7 @@ export function DeckWorkspace({
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] dark:text-[#A8A29E] tabular-nums pt-0.5">
-                <span>{stats.total} {stats.total === 1 ? 'word' : 'words'}</span>
+                <span>{stats.total} {pluralize(stats.total, 'word', 'words')}</span>
                 <span aria-hidden="true">·</span>
                 <span>{stats.easy} easy</span>
                 <span aria-hidden="true">·</span>
@@ -1174,7 +1178,7 @@ export function DeckWorkspace({
                     <span aria-hidden="true">·</span>
                     <span
                       className="text-emerald-700 dark:text-emerald-300 font-medium"
-                      title={`${selectedDeckMastery.mastered} mastered · ${selectedDeckMastery.learning} learning · ${selectedDeckMastery.fresh} new`}
+                      title={t('{mastered} mastered · {learning} learning · {fresh} new', { mastered: selectedDeckMastery.mastered, learning: selectedDeckMastery.learning, fresh: selectedDeckMastery.fresh })}
                     >
                       {selectedDeckMastery.masteryPct}% mastery
                     </span>
@@ -1256,7 +1260,7 @@ export function DeckWorkspace({
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         exportDeckAsJson(selectedDeck, deckCards);
-                        onNotify(`Exported "${selectedDeck.name}" as JSON`, 'success');
+                        onNotify(t('Exported "{name}" as JSON', { name: selectedDeck.name }), 'success');
                       }}
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
@@ -1268,7 +1272,7 @@ export function DeckWorkspace({
                       onClick={() => {
                         setHeaderMenuOpen(false);
                         exportDeckAsCsv(selectedDeck, deckCards);
-                        onNotify(`Exported "${selectedDeck.name}" as CSV`, 'success');
+                        onNotify(t('Exported "{name}" as CSV', { name: selectedDeck.name }), 'success');
                       }}
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
@@ -1471,7 +1475,7 @@ export function DeckWorkspace({
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
                   {activeSmartDeck
                     ? t('The filter matches no cards at the moment — it will populate automatically as cards enter the matching SRS state.')
-                    : <>Add words individually or paste a list in <code className="font-mono">{t('word - translation')}</code> format.</>}
+                    : t('Add words individually or paste a list in "{format}" format.', { format: t('word - translation') })}
                 </p>
                 {!activeSmartDeck && (
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
@@ -1530,7 +1534,7 @@ export function DeckWorkspace({
                           type="checkbox"
                           checked={selectedCardIds.has(card.id)}
                           onChange={() => toggleCardSelection(card.id)}
-                          aria-label={`Select ${card.word}`}
+                          aria-label={t('Select {word}', { word: card.word })}
                           className="mt-1.5 w-4 h-4 shrink-0 rounded border-slate-300 dark:border-[#3A352F] accent-[#B45309] cursor-pointer"
                         />
                       )}
@@ -1581,7 +1585,7 @@ export function DeckWorkspace({
                             <button
                               type="button"
                               onClick={() => onOpenLinkedNote(card.linkedNoteId!)}
-                              aria-label={`Open linked note for ${card.word}`}
+                              aria-label={t('Open linked note for {word}', { word: card.word })}
                               title={t('Open linked notebook note')}
                               className="p-1.5 rounded-lg text-[#B45309] dark:text-[#F59E0B] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
                             >
@@ -1606,7 +1610,7 @@ export function DeckWorkspace({
                         <div className="relative">
                           <button
                             type="button"
-                            aria-label={`Actions for ${card.word}`}
+                            aria-label={t('Actions for {word}', { word: card.word })}
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenDeckMenuId(null);
@@ -1775,7 +1779,7 @@ export function DeckWorkspace({
                     autoFocus
                     value={deckName}
                     onChange={(e) => setDeckName(e.target.value)}
-                    placeholder={`e.g., ${languageName} Travel Essentials`}
+                    placeholder={t('e.g., {name} Travel Essentials', { name: languageName })}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -1826,12 +1830,11 @@ export function DeckWorkspace({
                   </button>
                 </div>
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                  Are you sure you want to delete{' '}
-                  <strong className="text-[#1C1917] dark:text-[#F5F2EC]">
-                    {modal.deck.name}
-                  </strong>
-                  ? This removes all {cards.filter((c) => c.deckId === modal.deck.id).length} words
-                  in this deck from your browser storage.
+                  {t('Are you sure you want to delete "{name}"? This removes all {count} {words} in this deck from your browser storage.', {
+                    name: modal.deck.name,
+                    count: cards.filter((c) => c.deckId === modal.deck.id).length,
+                    words: pluralize(cards.filter((c) => c.deckId === modal.deck.id).length, 'word', 'words'),
+                  })}
                 </p>
                 <div className="flex items-center justify-end gap-2.5 pt-2">
                   <button
@@ -1927,7 +1930,7 @@ export function DeckWorkspace({
                         autoFocus
                         value={cardWord}
                         onChange={(e) => setCardWord(e.target.value)}
-                        placeholder={`e.g., a ${languageName} word`}
+                        placeholder={t('e.g., a {name} word', { name: languageName })}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                       <DiacriticBar
@@ -1938,8 +1941,7 @@ export function DeckWorkspace({
                         <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           <span>
-                            &ldquo;{duplicateMatch.word}&rdquo; already exists in this
-                            deck — you can still add it if the meaning differs.
+                            {t('"{word}" already exists in this deck — you can still add it if the meaning differs.', { word: duplicateMatch.word })}
                           </span>
                         </p>
                       )}
@@ -2028,13 +2030,10 @@ export function DeckWorkspace({
                 ) : (
                   <form onSubmit={handleBulkSubmit} className="space-y-4">
                     <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                      Paste one entry per line as{' '}
-                      <code className="font-mono">{languageName} word - meaning</code>.
-                      Tabs, semicolons, commas and{' '}
-                      <code className="font-mono">word,translation,example</code> CSV
-                      rows also work — or load a <code className="font-mono">.csv</code>/
-                      <code className="font-mono">.txt</code> file below. Add an example
-                      sentence after <code className="font-mono">|</code>.
+                      {t('Paste one entry per line as "{format}". Tabs, semicolons, commas and "{csv}" CSV rows also work — or load a .csv/.txt file below. Add an example sentence after "|".', {
+                        format: `${languageName} word - meaning`,
+                        csv: 'word,translation,example',
+                      })}
                     </p>
 
                     <button
@@ -2072,7 +2071,7 @@ export function DeckWorkspace({
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs tabular-nums">
                       <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                        {bulkParsed.items.length} valid {bulkParsed.items.length === 1 ? 'entry' : 'entries'}
+                        {t('{count} valid {entries}', { count: bulkParsed.items.length, entries: pluralize(bulkParsed.items.length, 'entry', 'entries') })}
                       </span>
                       {bulkParsed.skippedLines.length > 0 && (
                         <span className="text-amber-700 dark:text-amber-400">
@@ -2138,8 +2137,7 @@ export function DeckWorkspace({
                     <p className="mt-1.5 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       <span>
-                        &ldquo;{duplicateMatch.word}&rdquo; already exists in this
-                        deck — you can still save if the meaning differs.
+                        {t('"{word}" already exists in this deck — you can still save if the meaning differs.', { word: duplicateMatch.word })}
                       </span>
                     </p>
                   )}
@@ -2242,7 +2240,7 @@ export function DeckWorkspace({
 
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-                    Choose a <code className="font-mono">.json</code> file or paste exported JSON below.
+                    {t('Choose a .json file or paste exported JSON below.')}
                   </span>
                   <input
                     ref={fileInputRef}
@@ -2389,7 +2387,7 @@ export function DeckWorkspace({
                     <strong className="text-[#B45309] dark:text-[#F59E0B]">
                       {smartPreviewCount}
                     </strong>{' '}
-                    {smartPreviewCount === 1 ? 'word' : 'words'}
+                    {pluralize(smartPreviewCount, 'word', 'words')}
                   </p>
                 </div>
 
@@ -2451,12 +2449,7 @@ export function DeckWorkspace({
                   </button>
                 </div>
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                  Delete{' '}
-                  <strong className="text-[#1C1917] dark:text-[#F5F2EC]">
-                    {modal.smartDeck.name}
-                  </strong>
-                  ? This only removes the saved filter — your words and study
-                  progress are not affected.
+                  {t('Delete "{name}"? This only removes the saved filter — your words and study progress are not affected.', { name: modal.smartDeck.name })}
                 </p>
                 <div className="flex items-center justify-end gap-2.5 pt-2">
                   <button

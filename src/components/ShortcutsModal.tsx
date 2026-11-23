@@ -44,7 +44,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="Keyboard shortcuts"
+      ariaLabel={t('Keyboard shortcuts')}
       panelClassName="max-w-md [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]"
     >
       <div className="p-6">
@@ -71,7 +71,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
         <div className="space-y-6">
           <Section title={t('Flashcards')}>
             <ShortcutRow keys={[t('Space')]} label={t('Flip card')} />
-            <ShortcutRow keys={['←', '→']} label="Previous / next card" />
+            <ShortcutRow keys={['←', '→']} label={t('Previous / next card')} />
             <ShortcutRow keys={['1']} label={t('Rate: Hard')} />
             <ShortcutRow keys={['2']} label={t('Rate: Good')} />
             <ShortcutRow keys={['3']} label={t('Rate: Easy')} />
@@ -79,15 +79,15 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
 
           <Section title={t('Quizzes')}>
             <ShortcutRow keys={['1', '–', '4']} label={t('Select answer option')} />
-            <ShortcutRow keys={['T']} label="True / False: True" />
-            <ShortcutRow keys={['F']} label="True / False: False" />
+            <ShortcutRow keys={['T']} label={t('True / False: True')} />
+            <ShortcutRow keys={['F']} label={t('True / False: False')} />
             <ShortcutRow keys={['R']} label={t('Replay pronunciation')} />
-            <ShortcutRow keys={[t('Enter')]} label="Submit / Continue" />
-            <ShortcutRow keys={[t('Esc')]} label="Close dialog / menu" />
+            <ShortcutRow keys={[t('Enter')]} label={t('Submit / Continue')} />
+            <ShortcutRow keys={[t('Esc')]} label={t('Close dialog / menu')} />
           </Section>
 
           <Section title={t('Global')}>
-            <ShortcutRow keys={[t('Ctrl'), 'K']} label="Command palette (Cmd on Mac)" />
+            <ShortcutRow keys={[t('Ctrl'), 'K']} label={t('Command palette (Cmd on Mac)')} />
             <ShortcutRow keys={['G', 'W']} label={t('Go to Words')} />
             <ShortcutRow keys={['G', 'Q']} label={t('Go to Quiz')} />
             <ShortcutRow keys={['G', 'S']} label={t('Go to Statistics')} />

@@ -13,7 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Note } from '../types';
-import { t } from '../i18n';
+import { pluralize, t } from '../i18n';
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -141,7 +141,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
     const title = escapeHtml(noteTitle(note));
     const bodyHtml = draft.trim()
       ? escapeHtml(draft).replace(/\n/g, '<br>')
-      : '<em>No content</em>';
+      : `<em>${escapeHtml(t('No content'))}</em>`;
     const updated = new Date(note.updatedAt).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
@@ -149,7 +149,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
     });
     win.document.write(
       `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
-        `<style>body{font-family:Georgia,t('Times New Roman'),serif;max-width:640px;margin:48px auto;padding:0 24px;color:#1c1917;line-height:1.75}h1{font-size:24px;margin-bottom:4px}h1{font-weight:600}.meta{color:#78716c;font-size:12px;margin-bottom:28px}.content{font-size:15px;white-space:normal}@media print{body{margin:24px}}</style>` +
+        `<style>body{font-family:Georgia,'Times New Roman',serif;max-width:640px;margin:48px auto;padding:0 24px;color:#1c1917;line-height:1.75}h1{font-size:24px;margin-bottom:4px}h1{font-weight:600}.meta{color:#78716c;font-size:12px;margin-bottom:28px}.content{font-size:15px;white-space:normal}@media print{body{margin:24px}}</style>` +
         `</head><body><h1>${title}</h1><div class="meta">${updated}</div><div class="content">${bodyHtml}</div>` +
         `<scr` + `ipt>window.addEventListener('load',()=>window.print())</scr` + `ipt></body></html>`
     );
@@ -168,13 +168,13 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="hidden sm:inline text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
-            {wordCount} {wordCount === 1 ? 'word' : 'words'} · {charCount} chars
+            {wordCount} {pluralize(wordCount, 'word', 'words')} · {charCount} {pluralize(charCount, 'char', 'chars')}
           </span>
           <button
             type="button"
             onClick={handlePrint}
-            aria-label={`Print ${noteTitle(note)}`}
-            title="Print / export as PDF"
+            aria-label={t('Print {title}', { title: noteTitle(note) })}
+            title={t('Print / export as PDF')}
             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={t('Jot down grammar rules, example sentences, tricky words, or anything worth remembering…')}
-        aria-label={`Note: ${noteTitle(note)}`}
+        aria-label={t('Note: {title}', { title: noteTitle(note) })}
         spellCheck
         className="flex-1 min-h-[20rem] w-full resize-none bg-transparent px-5 py-4 text-sm leading-relaxed text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#A8A29E] dark:placeholder:text-[#57534E] focus:outline-none"
       />
@@ -365,7 +365,7 @@ export function NotesPanel({
                             setRenamingId(note.id);
                             setRenameDraft(note.title ?? '');
                           }}
-                          aria-label={`Rename ${noteTitle(note)}`}
+                          aria-label={t('Rename {title}', { title: noteTitle(note) })}
                           title={t('Rename')}
                           className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors"
                         >
@@ -387,7 +387,7 @@ export function NotesPanel({
                         <button
                           type="button"
                           onClick={() => onDeleteNote(note.id)}
-                          aria-label={`Delete ${noteTitle(note)}`}
+                          aria-label={t('Delete {title}', { title: noteTitle(note) })}
                           title={t('Delete')}
                           className="p-1 rounded-md text-red-700/70 dark:text-red-400/70 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                         >

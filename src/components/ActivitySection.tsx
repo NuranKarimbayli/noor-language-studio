@@ -3,7 +3,7 @@ import { Bug, CalendarClock, Flame, History, Minus, Plus, Target, TrendingUp } f
 import { ActivityDay, MasterySnapshot, SessionMode, SessionRecord, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getDailyForecast, isLeechCard } from '../utils/srs';
-import { t } from '../i18n';
+import { pluralize, t } from '../i18n';
 
 interface ActivitySectionProps {
   activity: ActivityDay[];
@@ -34,6 +34,14 @@ const SESSION_MODE_LABELS: Record<SessionMode, string> = {
   'fill-blank': t('Fill Blank'),
   speaking: t('Speaking'),
 };
+
+function heatCellStats(cell: HeatCell): string {
+  const parts: string[] = [];
+  if (cell.reviews > 0) parts.push(`${cell.reviews} ${pluralize(cell.reviews, 'review', 'reviews')}`);
+  if (cell.quizzes > 0) parts.push(`${cell.quizzes} ${pluralize(cell.quizzes, 'quiz', 'quizzes')}`);
+  if (cell.added > 0) parts.push(`+${cell.added} ${pluralize(cell.added, 'word', 'words')}`);
+  return parts.join(', ');
+}
 
 function formatSessionTime(iso: string): string {
   const date = new Date(iso);
@@ -250,9 +258,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
                 tabIndex={0}
                 role="img"
                 aria-label={`${formatHeatDate(cell.date)}: ${
-                  cell.value > 0
-                    ? `${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}${cell.quizzes > 0 ? `, ${cell.quizzes} ${cell.quizzes === 1 ? 'quiz' : 'quizzes'}` : ''}${cell.added > 0 ? `, ${cell.added} new ${cell.added === 1 ? 'word' : 'words'}` : ''}`
-                    : t('No practice recorded')
+                  cell.value > 0 ? heatCellStats(cell) : t('No practice recorded')
                 }`}
                 onMouseEnter={(e) => showTooltipFor(cell, e.currentTarget, setTip)}
                 onMouseLeave={() => setTip(null)}
@@ -288,10 +294,10 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
                   <span className="font-medium text-[#FAF8F5] dark:text-[#1C1917]">
                     {tip.cell.value}
                   </span>{' '}
-                  practice {tip.cell.value === 1 ? 'action' : 'actions'}
-                  {tip.cell.reviews > 0 && ` · ${tip.cell.reviews} ${tip.cell.reviews === 1 ? 'review' : 'reviews'}`}
-                  {tip.cell.quizzes > 0 && ` · ${tip.cell.quizzes} ${tip.cell.quizzes === 1 ? 'quiz' : 'quizzes'}`}
-                  {tip.cell.added > 0 && ` · ${tip.cell.added} new ${tip.cell.added === 1 ? 'word' : 'words'}`}
+                  {pluralize(tip.cell.value, 'action', 'actions')}
+                  {tip.cell.reviews > 0 && ` · ${tip.cell.reviews} ${pluralize(tip.cell.reviews, 'review', 'reviews')}`}
+                  {tip.cell.quizzes > 0 && ` · ${tip.cell.quizzes} ${pluralize(tip.cell.quizzes, 'quiz', 'quizzes')}`}
+                  {tip.cell.added > 0 && ` · +${tip.cell.added} ${pluralize(tip.cell.added, 'word', 'words')}`}
                 </>
               ) : (
                 t('No practice recorded')
@@ -516,11 +522,17 @@ export function ActivitySection({
           <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
             {goalReached
               ? t('Daily goal reached — nicely done.')
-              : `${dailyGoal - todayReviews} more ${dailyGoal - todayReviews === 1 ? 'word' : 'words'} to hit today's goal.`}
+              : t('{count} more {words} to hit today\'s goal.', {
+                  count: dailyGoal - todayReviews,
+                  words: pluralize(dailyGoal - todayReviews, 'word', 'words'),
+                })}
             {todayAdded > 0 && (
               <span className="text-emerald-700 dark:text-emerald-400">
                 {' '}
-                · +{todayAdded} new {todayAdded === 1 ? 'word' : 'words'} today
+                · {t('+{count} new {words} today', {
+                    count: todayAdded,
+                    words: pluralize(todayAdded, 'word', 'words'),
+                  })}
               </span>
             )}
           </p>
@@ -529,7 +541,10 @@ export function ActivitySection({
               <span className="font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
                 {totalCardsAdded}
               </span>{' '}
-              new {totalCardsAdded === 1 ? 'word' : 'words'} added all-time
+              {t('new {count} {words} added all-time', {
+                count: totalCardsAdded,
+                words: pluralize(totalCardsAdded, 'word', 'words'),
+              })}
             </p>
           )}
         </div>
@@ -568,8 +583,9 @@ export function ActivitySection({
           {backupStaleDays !== null && onExportBackup && (
             <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <span>
-                Last backup {backupStaleDays === 0 ? 'today' : `${backupStaleDays}d`} ago —
-                your data lives only in this browser.
+                {t('Last backup {when} ago — your data lives only in this browser.', {
+                  when: backupStaleDays === 0 ? t('today') : `${backupStaleDays}d`,
+                })}
               </span>
               <button
                 type="button"
@@ -673,7 +689,12 @@ export function ActivitySection({
             <div
               key={snap.id}
               className="flex-1 flex flex-col items-center gap-1 min-w-0"
-              title={`${snap.weekKey}: ${snap.masteryPct}% mastery (${snap.mastered}/${snap.total} mastered)`}
+              title={t('{week}: {pct}% mastery ({mastered}/{total} mastered)', {
+                week: snap.weekKey,
+                pct: snap.masteryPct,
+                mastered: snap.mastered,
+                total: snap.total,
+              })}
             >
               <span className="text-[10px] font-mono text-[#78716C] dark:text-[#A8A29E] tabular-nums">
                 {snap.masteryPct}%
@@ -709,8 +730,7 @@ export function ActivitySection({
 
       {sessions.length === 0 ? (
         <p className="text-xs text-[#78716C] dark:text-[#A8A29E] py-4 text-center">
-          No sessions completed yet — finish a quiz or flashcard round to start
-          tracking accuracy.
+          {t('No sessions completed yet — finish a quiz or flashcard round to start tracking accuracy.')}
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

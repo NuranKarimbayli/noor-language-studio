@@ -219,7 +219,7 @@ export function CommandPalette({
   let lastSection = '';
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Command palette" panelClassName="max-w-xl overflow-hidden">
+    <Modal open={open} onClose={onClose} ariaLabel={t('Command palette')} panelClassName="max-w-xl overflow-hidden">
       <div className="w-full">
         <div className="flex items-center gap-2.5 px-4 border-b border-slate-200 dark:border-[#2E2A25]">
           <Search className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />

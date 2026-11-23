@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { CommandPalette, type PaletteActionId } from './components/CommandPalette';
-import { setUiLanguage, t } from './i18n';
+import { pluralize, setUiLanguage, t } from './i18n';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlashcardStudy } from './components/FlashcardStudy';
@@ -338,7 +338,10 @@ export default function App() {
       localStorage.setItem('noor_last_review_reminder', today);
       try {
         const notification = new Notification(t('Noor Language Studio'), {
-          body: `${due} ${due === 1 ? 'card is' : 'cards are'} due for review today.`,
+          body: t('{count} {cards} due for review today.', {
+            count: due,
+            cards: pluralize(due, 'card'),
+          }),
         });
         notification.onclick = () => window.focus();
       } catch {
@@ -569,7 +572,7 @@ export default function App() {
       };
       await addLanguage(newLang);
       setLanguages((prev) => [...prev, newLang]);
-      notify(`Added "${newLang.name}" to your languages`, 'success');
+      notify(t('Added "{name}" to your languages', { name: newLang.name }), 'success');
       return newLang;
     },
     [notify]
@@ -632,7 +635,7 @@ export default function App() {
         setActiveLanguageId(nextActiveId);
         setStage('languages');
       }
-      notify(`Removed "${target.name}"`, 'info', {
+      notify(t('Removed "{name}"', { name: target.name }), 'info', {
         label: t('Undo'),
         onAction: () => {
           void Promise.all([
@@ -718,7 +721,7 @@ export default function App() {
         setActiveSession(null);
       }
       if (removedDeck) {
-        notify(`Deleted "${removedDeck.name}"`, 'info', {
+        notify(t('Deleted "{name}"', { name: removedDeck.name }), 'info', {
           label: t('Undo'),
           onAction: () => {
             void Promise.all([addDeck(removedDeck), putCards(removedCards)])
@@ -844,7 +847,7 @@ export default function App() {
       setActiveSession(null);
     }
     if (removed) {
-      notify(`Removed "${removed.word}"`, 'info', {
+      notify(t('Removed "{word}"', { word: removed.word }), 'info', {
         label: t('Undo'),
         onAction: () => {
           void addCard(removed)
@@ -1057,7 +1060,12 @@ export default function App() {
         void putCards(clearedCards).catch(console.error);
       }
       if (removed) {
-        notify(`Deleted "${removed.title?.trim() || t('Untitled note')}"`, 'info', {
+        notify(
+          t('Deleted "{title}"', {
+            title: removed.title?.trim() || t('Untitled note'),
+          }),
+          'info',
+          {
           label: t('Undo'),
           onAction: () => {
             void putNote(removed)
@@ -1106,7 +1114,7 @@ export default function App() {
         );
         setWorkspaceView('notes');
         setNotesFocusId(note.id);
-        notify(`Sent "${card.word}" to Blacknotes`, 'success');
+        notify(t('Sent "{word}" to Blacknotes', { word: card.word }), 'success');
       } catch {
         notify(t('Could not create the note. Please try again.'), 'error');
       }
@@ -1194,7 +1202,7 @@ export default function App() {
       setCards((prev) => prev.map((c) => (c.id === card.id ? graduated : c)));
       putCards([graduated]).catch(console.error);
       if (cleared) {
-        notify(`"${card.word}" graduated from leech status`, 'success');
+        notify(t('"{word}" graduated from leech status', { word: card.word }), 'success');
       }
     },
     [notify]
@@ -1250,7 +1258,7 @@ export default function App() {
       };
       await addSmartDeck(smartDeck);
       setSmartDecks((prev) => [...prev, smartDeck]);
-      notify(`Smart deck "${smartDeck.name}" created`, 'success');
+      notify(t('Smart deck "{name}" created', { name: smartDeck.name }), 'success');
     },
     [activeLanguage.id, notify]
   );
@@ -1261,7 +1269,7 @@ export default function App() {
       await dbDeleteSmartDeck(smartDeckId);
       setSmartDecks((prev) => prev.filter((s) => s.id !== smartDeckId));
       if (removed) {
-        notify(`Deleted smart deck "${removed.name}"`, 'info', {
+        notify(t('Deleted smart deck "{name}"', { name: removed.name }), 'info', {
           label: t('Undo'),
           onAction: () => {
             void addSmartDeck(removed)
@@ -1284,7 +1292,7 @@ export default function App() {
     (smartDeck: SmartDeck) => {
       const pool = getSmartDeckCards(languageCards, smartDeck.filter);
       if (pool.length === 0) {
-        notify(`"${smartDeck.name}" has no matching words right now`, 'info');
+        notify(t('"{name}" has no matching words right now', { name: smartDeck.name }), 'info');
         return;
       }
       setActiveSession({
@@ -1312,7 +1320,10 @@ export default function App() {
         setActiveSession(null);
       }
       notify(
-        `Deleted ${removed.length} ${removed.length === 1 ? 'word' : 'words'}`,
+        t('Deleted {count} {words}', {
+          count: removed.length,
+          words: pluralize(removed.length, 'word', 'words'),
+        }),
         'info',
         {
           label: t('Undo'),
@@ -1350,12 +1361,16 @@ export default function App() {
         ? decks.find((d) => d.id === updates.deckId)?.name
         : undefined;
       const what = movedTo
-        ? `moved to "${movedTo}"`
+        ? t('moved to "{name}"', { name: movedTo })
         : updates.difficulty
-          ? `marked ${updates.difficulty}`
-          : 'updated';
+          ? t('marked {difficulty}', { difficulty: t(updates.difficulty) })
+          : t('updated');
       notify(
-        `${updated.length} ${updated.length === 1 ? 'word' : 'words'} ${what}`,
+        t('{count} {words} {what}', {
+          count: updated.length,
+          words: pluralize(updated.length, 'word', 'words'),
+          what,
+        }),
         'success',
         {
           label: t('Undo'),
@@ -1600,10 +1615,14 @@ export default function App() {
 
     if (!validQuiz && !validFlash) return;
 
-    const kind = validQuiz ? 'quiz' : 'flashcards';
+    const kind = validQuiz ? t('quiz session') : t('flashcard session');
     const count = validQuiz ? validQuiz.questions.length : validFlash!.queueIds.length;
     notify(
-      `Interrupted ${kind === 'quiz' ? 'quiz' : 'flashcard'} session found (${count} ${count === 1 ? 'item' : 'items'})`,
+      t('Interrupted {kind} session found ({count} {items})', {
+        kind,
+        count,
+        items: pluralize(count, 'item', 'items'),
+      }),
       'info',
       {
         label: t('Resume'),
@@ -1800,7 +1819,13 @@ export default function App() {
     });
 
     if (mode === 'weak') {
-      notify(`Focusing on ${pool.length} weak ${pool.length === 1 ? 'word' : 'words'}`, 'info');
+      notify(
+        t('Focusing on {count} weak {words}', {
+          count: pool.length,
+          words: pluralize(pool.length, 'word', 'words'),
+        }),
+        'info'
+      );
     }
   }, [languageCards, notify, beginSession]);
 
@@ -1920,7 +1945,7 @@ export default function App() {
                 type="button"
                 onClick={() => setShortcutsOpen(true)}
                 aria-label={t('Keyboard shortcuts')}
-                title="Keyboard shortcuts (?)"
+                title={t('Keyboard shortcuts (?)')}
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 <Keyboard className="w-4 h-4" />
@@ -2055,7 +2080,7 @@ export default function App() {
                 type="button"
                 onClick={() => setPaletteOpen(true)}
                 aria-label={t('Command palette')}
-                title="Command palette (Ctrl+K)"
+                title={t('Command palette (Ctrl+K)')}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors text-xs font-medium"
               >
                 <Search className="w-3.5 h-3.5" />
@@ -2069,7 +2094,7 @@ export default function App() {
                 type="button"
                 onClick={() => setShortcutsOpen(true)}
                 aria-label={t('Keyboard shortcuts')}
-                title="Keyboard shortcuts (?)"
+                title={t('Keyboard shortcuts (?)')}
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 <Keyboard className="w-4 h-4" />
@@ -2182,7 +2207,8 @@ export default function App() {
                         <CalendarClock className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
                         <p className="text-sm text-amber-900 dark:text-amber-200 truncate">
                           <span className="font-semibold tabular-nums">{dueTodayCount}</span>{' '}
-                          {dueTodayCount === 1 ? 'card is' : 'cards are'} due for review today
+                          {pluralize(dueTodayCount, 'card')}{' '}
+                          {t('due for review today')}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">

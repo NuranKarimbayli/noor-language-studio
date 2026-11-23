@@ -282,7 +282,7 @@ export function QuizSetupModal({
     <Modal
       open={open}
       onClose={onClose}
-      ariaLabel="Study and Quiz Setup"
+      ariaLabel={t('Study and Quiz Setup')}
       panelClassName="max-w-2xl p-6 sm:p-7 max-h-[90vh] overflow-y-auto space-y-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]"
     >
         {/* Header */}
@@ -373,15 +373,13 @@ export function QuizSetupModal({
           {!voiceSupported && (
             <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              Listening quiz requires a supported browser voice for this
-              language. Speaker buttons are disabled for {languageName}.
+              {t('Listening quiz requires a supported browser voice for this language. Speaker buttons are disabled for {name}.', { name: languageName })}
             </p>
           )}
           {!recognitionSupported && SPEAKING_PRACTICE_ENABLED && (
             <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              Speaking Practice is unavailable — it needs Chrome or Edge with
-              microphone speech recognition.
+              {t('Speaking Practice is unavailable — it needs Chrome or Edge with microphone speech recognition.')}
             </p>
           )}
         </div>
@@ -478,8 +476,7 @@ export function QuizSetupModal({
             ))}
           </div>
           <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
-            Meaning → Word tests production recall — the harder, higher-value
-            direction. Mixed alternates both.
+            {t('Meaning → Word tests production recall — the harder, higher-value direction. Mixed alternates both.')}
           </p>
         </div>
 
@@ -639,8 +636,7 @@ export function QuizSetupModal({
                     {t('Same-Deck Options Only')}
                   </span>
                   <span className="block text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed mt-0.5">
-                    Incorrect options are drawn from the same deck as the question
-                    whenever possible, keeping distractors contextually relevant.
+                    {t('Incorrect options are drawn from the same deck as the question whenever possible, keeping distractors contextually relevant.')}
                   </span>
                 </span>
               </label>
@@ -659,8 +655,7 @@ export function QuizSetupModal({
                   {t('Due Reviews Only')}
                 </span>
                 <span className="block text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed mt-0.5">
-                  Restrict this session to cards whose spaced-repetition review
-                  is due now. Turn off for full-deck practice.
+                  {t('Restrict this session to cards whose spaced-repetition review is due now. Turn off for full-deck practice.')}
                 </span>
               </span>
             </label>
