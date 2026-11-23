@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
+  Check,
   Download,
   FastForward,
   Keyboard,
+  Languages,
   Monitor,
   Moon,
   NotebookPen,
@@ -13,7 +15,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { ThemeMode } from '../types';
+import { LanguageItem, ThemeMode } from '../types';
 import { Modal } from './Modal';
 
 interface SettingsModalProps {
@@ -46,6 +48,9 @@ interface SettingsModalProps {
   canInstallApp?: boolean;
   onInstallApp?: () => void;
   lastBackupAt?: string;
+  languages?: LanguageItem[];
+  activeLanguageId?: string;
+  onSelectLanguage?: (languageId: string) => void;
 }
 
 function Toggle({
@@ -143,6 +148,9 @@ export function SettingsModal({
   canInstallApp = false,
   onInstallApp,
   lastBackupAt,
+  languages = [],
+  activeLanguageId = '',
+  onSelectLanguage,
 }: SettingsModalProps) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -198,6 +206,48 @@ export function SettingsModal({
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pt-4 pb-2 space-y-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]">
+        {/* Language */}
+        {languages.length > 0 && onSelectLanguage && (
+          <Section icon={Languages} title="Language">
+            <div className="py-2 space-y-1">
+              {languages.map((lang) => {
+                const isActive = lang.id === activeLanguageId;
+                return (
+                  <button
+                    key={lang.id}
+                    type="button"
+                    onClick={() => onSelectLanguage(lang.id)}
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? 'bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#1C1917] dark:text-[#F5F2EC]'
+                        : 'text-[#44403C] dark:text-[#D6D3D1] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span className="font-medium truncate">{lang.name}</span>
+                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate">
+                        {lang.nativeLabel}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] font-mono uppercase tracking-wide text-[#A8A29E] dark:text-[#78716C]">
+                        {lang.code}
+                      </span>
+                      {isActive && (
+                        <Check className="w-4 h-4 text-[#B45309] dark:text-[#D97706]" />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed px-1 pb-1">
+              Switch the active language — decks, words, and study sessions
+              follow your selection.
+            </p>
+          </Section>
+        )}
+
         {/* Appearance */}
         <Section icon={Moon} title="Appearance">
           <div className="py-3 space-y-2">

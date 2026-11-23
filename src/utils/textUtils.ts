@@ -277,6 +277,11 @@ export const DIACRITIC_PRESETS: DiacriticPreset[] = [
     label: 'Turkish',
     chars: ['ç', 'ğ', 'ı', 'ö', 'ş', 'ü'],
   },
+  {
+    id: 'ru-RU',
+    label: 'Russian',
+    chars: ['ё', 'ж', 'щ', 'ъ', 'ы', 'ь', 'э', 'ю', 'я', 'х', 'ц', 'ш'],
+  },
 ];
 
 export function getDiacriticsForLang(speechLang: string): DiacriticPreset {
