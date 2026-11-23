@@ -2,43 +2,56 @@
 
 A minimalist, privacy-first language learning studio. Build custom vocabulary decks, study them with spaced repetition (SRS), quizzes, and browser-native text-to-speech pronunciation — all stored locally in your browser's IndexedDB. No accounts, no backend, no cloud sync.
 
+The interface is available in **English** and **Russian** (Русский), selectable under **Settings → Interface language**. The studied language (decks/words) is chosen separately and is not affected by the UI language.
+
 ## Features
 
 ### Study Modes
-- **Flashcards** — flip cards with Space, navigate with arrow keys, and rate recall (Hard / Good / Easy) to drive SRS scheduling.
-- **Quizzes** — multiple choice, fill-in-the-blank, true/false, and listening comprehension. Optional per-question cooldown timer with smooth color progression and a flashing critical state.
-- **Smart Review** — automatically prioritizes cards that are due for review using Leitner-box SRS scheduling.
+- **Flashcards** — flip cards with Space, navigate with arrow keys, and rate recall (Hard / Good / Easy) to drive SRS scheduling. In-session relearning re-queues cards rated Hard or answered wrong for another pass.
+- **Quizzes** — multiple choice, true/false, listening, typing, and fill-in-the-blank. Optional per-question cooldown timer with smooth color progression and a flashing critical state.
+- **Bidirectional direction** — word→translation (recognition), translation→word (production recall), or mixed, chosen per session in quiz setup.
+- **Smart Review** — automatically prioritizes cards that are due or weak using Leitner-box SRS scheduling.
+- **Session resume** — interrupted quiz/flashcard sessions are snapshotted to `sessionStorage` and offered for resume on return.
 
 ### Spaced Repetition (SRS)
-- Per-card `srsBox`, `nextReviewAt`, `lapses`, and `wrongCount` fields.
-- **Due Reviews Only** filter for both flashcards and quizzes.
-- **Review Forecast** — see how many cards are due today, tomorrow, and this week.
-- Per-deck **mastery percentage** with New / Learning / Mastered breakdown.
-- **Leech detection** — stubborn cards (3+ lapses or 5+ wrong answers) get a badge and can be excluded or targeted in sessions.
+- Per-card `srsBox`, `nextReviewAt`, `lapses`, `wrongCount`, confidence, difficulty, mnemonic, and tags fields.
+- **Due Reviews Only** and **Leech Lab** filters for both flashcards and quizzes.
+- **Review Forecast** — a 7-day due forecast strip plus weekly mastery snapshots per language drawn as a trendline in Statistics.
+- Per-deck **mastery percentage** with New / Learning / Mastered breakdown and per-deck accuracy stats.
+- **Leech detection** — stubborn cards (3+ lapses or 5+ wrong answers) get a badge, can be excluded or targeted in sessions, and can "graduate" out of leech status.
 
-### Pronunciation
-- Browser-native Web Speech API TTS with per-language voice selection, voice preview, and a global mute.
-- Refuses unrelated fallback voices so pronunciation is never misleading.
-- Optional listening-comprehension quiz mode.
+### Decks, Cards & Notes
+- Multiple languages, decks, and smart decks (saved card filters: weak / due / leeches / new / hard / tag).
+- Card **tags** with picker, chips, and filtering; bulk card operations (move, retag difficulty, delete).
+- **Blacknotes** — multi-note sheets with pin/rename/autosave, card linking (`linkedNoteId`), "send card to notebook" prefilled with word/translation/example, print-friendly export, and jump-to-note from cards.
+- JSON/CSV per-deck import/export and full-workspace backup with Merge/Replace restore.
+- **Auto-backup nudges** — Statistics reminds you when `lastBackupAt` is older than 14 days, including inside the reset confirmation.
 
-### Data & Backup
-- **Full JSON export/import** with versioned backups, Merge and Replace restore modes.
-- Safe parsing with malformed-record filtering and backward compatibility for older data.
+### Pronunciation & Speech
+- Browser-native Web Speech API TTS with per-language voice selection, voice preview, and a global mute. `ru-RU` and other locales resolve automatically.
+- Cyrillic quick-insert character bar for Russian (`ru-RU`) and other language-specific diacritic presets.
+- Optional listening-comprehension quiz mode. (Speaking practice engine exists but is feature-flagged off.)
+
+### Power-User QoL
+- **Command palette** (`Ctrl/Cmd+K`) — fuzzy search across decks, cards, and notes, plus actions (new deck, add words, smart/due review, new note, export backup).
+- **Global shortcuts** — `g w/q/s/n` view navigation, `c` for new word, `?` cheat sheet; all repeat-safe and input-aware.
+- **Word of the Day** spotlight on the Words view.
+- **PWA** — installable via `beforeinstallprompt` (Install button in Settings), manifest + offline service worker.
+- Undo toasts (8s window) for deletions, toast notifications, sound effects, and speech toggles persisted in IndexedDB.
 
 ### UX & Accessibility
-- Keyboard-first: `?` opens a shortcut cheat sheet; all handlers are repeat-safe and ignore text inputs.
-- Undo toasts (8s window) for card, deck, and language deletions.
-- Consistent pointer cursors and restricted text selection — only vocabulary words and translations are selectable.
-- Light/dark themes, toast notifications, sound effects, and speech toggles persisted in IndexedDB.
-- Animated modals, toasts, and transitions via Motion.
+- Light/dark themes, consistent micro-animations, GPU-friendly transitions, and `prefers-reduced-motion` support.
+- Shared modal system: backdrop-click and **Escape** close (topmost-layer aware), scroll-locked background, theme-aware thin scrollbars.
+- Keyboard-first navigation; only vocabulary words and translations are selectable.
 
 ## Tech Stack
 
 - **React 19 + TypeScript**
 - **Vite 8**
-- **Tailwind CSS 4**
-- **IndexedDB** via `idb` — zero backend, all data stays on your device
+- **Tailwind CSS 4** + Motion
+- **IndexedDB** via `idb` (schema v8) — zero backend, all data stays on your device
 - **Vitest + Testing Library** for unit tests
+- Lightweight `t()` i18n layer (`src/i18n/`) with English source strings and a Russian dictionary; `pluralize()` handles Slavic plural rules
 
 ## Getting Started
 
@@ -49,7 +62,7 @@ npm install
 npm run dev
 ```
 
-The app runs at `http://localhost:3000`. All data is stored in the browser's IndexedDB — no `.env` file or API keys are required.
+The dev server prints its URL on startup (Vite default `http://localhost:5173`). All data is stored in the browser's IndexedDB — no `.env` file or API keys are required.
 
 ## Scripts
 
@@ -66,18 +79,24 @@ The app runs at `http://localhost:3000`. All data is stored in the browser's Ind
 
 ```
 src/
-├── App.tsx                  # State orchestration, persistence, routing
-├── types.ts                 # Domain models (Language, Deck, Card, SRS fields)
-├── components/              # UI screens and modals
-├── data/seedDecks.ts        # Preset starter decks
+├── App.tsx                  # State orchestration, persistence, routing, shortcuts
+├── types.ts                 # Domain models (Language, Deck, Card, SRS, sessions)
+├── i18n/                    # UI localization: t(), pluralize(), ru.ts dictionary
+├── components/              # UI screens, modals, palette, study sessions
+├── data/seedDecks.ts        # Preset languages and starter decks
 └── utils/
-    ├── indexedDB.ts         # IndexedDB schema, migrations, CRUD
-    ├── storage.ts           # Serialization, backup/restore helpers
+    ├── indexedDB.ts         # IndexedDB schema (v8), migrations, preset sync, CRUD
+    ├── storage.ts           # Serialization, import/export, backup/restore
+    ├── sessionResume.ts     # sessionStorage snapshots for interrupted sessions
     ├── srs.ts               # Leitner scheduling, due/forecast/mastery/leech
     ├── speechUtils.ts       # Web Speech TTS voice resolution
+    ├── textUtils.ts         # Answer normalization, diacritic presets, bulk parsing
     └── soundEffects.ts      # UI sound effects
+
+scripts/
+└── i18n-*.cjs               # Dictionary audit/dedup helpers for translators
 ```
 
 ## Data & Privacy
 
-All languages, decks, cards, study stats, and preferences live in **IndexedDB** on your device. Clearing browser site data will erase your progress — use **Data & Backup → Export All Data** in the app to keep a JSON backup.
+All languages, decks, cards, notes, study stats, and preferences live in **IndexedDB** on your device. Clearing browser site data will erase your progress — use **Data & Backup → Export backup** (or Settings) to keep a JSON backup. Statistics nudges you if the last backup is over 14 days old.
