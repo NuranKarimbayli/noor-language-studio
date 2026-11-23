@@ -77,6 +77,9 @@ interface NoorStudioDB extends DBSchema {
 const DB_NAME = 'noor-studio-db';
 const DB_VERSION = 8;
 const SEED_COMPLETED_KEY = 'seed-completed';
+// Meta key: ids of preset languages the user intentionally deleted, so the
+// preset sync on launch doesn't resurrect them.
+const PRESET_DELETIONS_KEY = 'preset-language-deletions';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
 
@@ -337,12 +340,43 @@ async function initializeWithSeedData(): Promise<void> {
   await db.put('meta', true, SEED_COMPLETED_KEY);
 }
 
+const PRESET_LANGUAGE_IDS = new Set(PRESET_LANGUAGES.map((l) => l.id));
+
+async function getPresetDeletions(db: IDBPDatabase<NoorStudioDB>): Promise<string[]> {
+  const stored = await db.get('meta', PRESET_DELETIONS_KEY);
+  return Array.isArray(stored) ? stored.filter((x): x is string => typeof x === 'string') : [];
+}
+
+/**
+ * Ensures every preset language exists in the store. Runs on every launch so
+ * databases seeded before a preset was added (or migrated from legacy
+ * localStorage) pick up newly introduced languages like Russian. Presets the
+ * user deliberately deleted are skipped via the deletions marker.
+ */
+async function syncPresetLanguages(): Promise<void> {
+  const db = await getDB();
+  const [existing, deletions] = await Promise.all([
+    db.getAll('languages'),
+    getPresetDeletions(db),
+  ]);
+  const existingIds = new Set(existing.map((l) => l.id));
+  const deleted = new Set(deletions);
+  const missing = PRESET_LANGUAGES.filter(
+    (lang) => !existingIds.has(lang.id) && !deleted.has(lang.id)
+  );
+  if (missing.length === 0) return;
+  const tx = db.transaction('languages', 'readwrite');
+  for (const lang of missing) tx.store.put(lang);
+  await tx.done;
+}
+
 /**
  * Initialize the database (migration + seed data)
  */
 export async function initializeDatabase(): Promise<void> {
   await migrateFromLocalStorage();
   await initializeWithSeedData();
+  await syncPresetLanguages();
 }
 
 // Language operations
@@ -354,11 +388,31 @@ export async function getAllLanguages(): Promise<LanguageItem[]> {
 export async function addLanguage(language: LanguageItem): Promise<void> {
   const db = await getDB();
   await db.put('languages', language);
+  // Re-adding a preset (undo delete, backup merge) clears its deletion marker
+  // so future preset syncs don't skip it.
+  if (PRESET_LANGUAGE_IDS.has(language.id)) {
+    const deletions = await getPresetDeletions(db);
+    if (deletions.includes(language.id)) {
+      await db.put(
+        'meta',
+        deletions.filter((id) => id !== language.id),
+        PRESET_DELETIONS_KEY
+      );
+    }
+  }
 }
 
 export async function deleteLanguage(languageId: string): Promise<void> {
   const db = await getDB();
   await db.delete('languages', languageId);
+  // Remember intentional preset deletions so syncPresetLanguages() doesn't
+  // bring them back on the next launch.
+  if (PRESET_LANGUAGE_IDS.has(languageId)) {
+    const deletions = await getPresetDeletions(db);
+    if (!deletions.includes(languageId)) {
+      await db.put('meta', [...deletions, languageId], PRESET_DELETIONS_KEY);
+    }
+  }
 }
 
 export async function updateLanguage(
@@ -742,6 +796,18 @@ export async function restoreBackupData(data: {
   if (data.stats) tx.objectStore('stats').put(data.stats, 'main');
 
   await tx.done;
+
+  // A replace-restore defines the language set authoritatively: presets
+  // present in the backup are un-deleted, presets absent are marked deleted
+  // so the launch-time preset sync doesn't resurrect them.
+  const restoredIds = new Set(data.languages.map((l) => l.id));
+  const deletions = await getPresetDeletions(db);
+  const next = new Set(deletions);
+  for (const preset of PRESET_LANGUAGES) {
+    if (restoredIds.has(preset.id)) next.delete(preset.id);
+    else next.add(preset.id);
+  }
+  await db.put('meta', [...next], PRESET_DELETIONS_KEY);
 }
 
 /**

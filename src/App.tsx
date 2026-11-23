@@ -249,7 +249,13 @@ export default function App() {
         setNotes(loadedNotes);
         setAppPrefs(loadedPrefs);
 
-        setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
+        // English is the default language when present; otherwise fall back
+        // to the first stored language (getAll order is not meaningful).
+        setActiveLanguageId(
+          loadedLanguages.find((l) => l.id === PRESET_LANGUAGES[0].id)?.id ??
+            loadedLanguages[0]?.id ??
+            PRESET_LANGUAGES[0].id
+        );
         setSelectedDeckId(loadedDecks[0]?.id ?? '');
       } catch (error) {
         console.error('Failed to initialize database:', error);

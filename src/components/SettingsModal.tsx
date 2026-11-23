@@ -210,7 +210,9 @@ export function SettingsModal({
         {languages.length > 0 && onSelectLanguage && (
           <Section icon={Languages} title="Language">
             <div className="py-2 space-y-1">
-              {languages.map((lang) => {
+              {[...languages]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((lang) => {
                 const isActive = lang.id === activeLanguageId;
                 return (
                   <button
