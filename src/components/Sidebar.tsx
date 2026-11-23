@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react';
 import {
   BarChart3,
   BookOpen,
@@ -96,16 +97,23 @@ export function Sidebar({
               title={collapsed && !mobile ? label : undefined}
               aria-label={label}
               aria-current={active ? 'page' : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out ${
                 collapsed && !mobile ? 'justify-center px-0' : ''
               } ${
                 active
-                  ? 'bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B]'
+                  ? 'bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] shadow-sm'
                   : 'text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
               }`}
             >
+              {/* Active indicator bar */}
+              <span
+                aria-hidden="true"
+                className={`absolute left-1 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-[#B45309] dark:bg-[#F59E0B] transition-all duration-200 ease-out ${
+                  active ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-50'
+                }`}
+              />
               <span className="relative shrink-0">
-                <Icon className="w-[18px] h-[18px]" />
+                <Icon className="w-[18px] h-[18px] transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                 {id === 'quiz' && dueCount > 0 && (
                   <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-[14px] text-center tabular-nums">
                     {dueCount > 9 ? '9+' : dueCount}
@@ -127,20 +135,20 @@ export function Sidebar({
             onCloseMobile?.();
           }}
           title={collapsed && !mobile ? 'Languages' : undefined}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors ${
+          className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-all duration-200 ease-out ${
             collapsed && !mobile ? 'justify-center px-0' : ''
           }`}
         >
-          <Languages className="w-[18px] h-[18px] shrink-0" />
+          <Languages className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
           {(!collapsed || mobile) && <span>Languages</span>}
         </button>
         {mobile ? (
           <button
             type="button"
             onClick={onCloseMobile}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-all duration-200 ease-out"
           >
-            <X className="w-[18px] h-[18px] shrink-0" />
+            <X className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-110" />
             <span>Close</span>
           </button>
         ) : (
@@ -149,15 +157,15 @@ export function Sidebar({
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#78716C] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors ${
+            className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#78716C] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-all duration-200 ease-out ${
               collapsed ? 'justify-center px-0' : ''
             }`}
           >
             {collapsed ? (
-              <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" />
+              <PanelLeftOpen className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
             ) : (
               <>
-                <PanelLeftClose className="w-[18px] h-[18px] shrink-0" />
+                <PanelLeftClose className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                 <span>Collapse</span>
               </>
             )}
@@ -168,18 +176,31 @@ export function Sidebar({
   );
 
   if (mobile) {
-    if (!mobileOpen) return null;
     return (
-      <>
-        <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] lg:hidden"
-          onClick={onCloseMobile}
-          aria-hidden="true"
-        />
-        <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-[#FAF8F5] dark:bg-[#171513] border-r border-slate-200 dark:border-[#2E2A25] shadow-xl lg:hidden flex flex-col">
-          {content}
-        </aside>
-      </>
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px] lg:hidden"
+              onClick={onCloseMobile}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            />
+            <motion.aside
+              className="fixed inset-y-0 left-0 z-50 w-64 bg-[#FAF8F5] dark:bg-[#171513] border-r border-slate-200 dark:border-[#2E2A25] shadow-xl lg:hidden flex flex-col"
+              initial={{ x: -280, opacity: 0.6 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -280, opacity: 0.6 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+            >
+              {content}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     );
   }
 

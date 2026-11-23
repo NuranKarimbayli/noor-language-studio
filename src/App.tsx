@@ -65,7 +65,6 @@ import {
   addLanguage,
   addSessionRecord,
   addSmartDeck,
-  clearAllData,
   deleteCard as dbDeleteCard,
   deleteCardsByIds,
   deleteDeck as dbDeleteDeck,
@@ -93,7 +92,9 @@ import {
   putActivityDay,
   putCards,
   putNote,
+  putSessionRecords,
   resetStudyProgress,
+  restoreBackupData,
   saveAppPrefs,
   saveSfxMuted,
   saveStats,
@@ -638,14 +639,15 @@ export default function App() {
       const removedDeck = decks.find((d) => d.id === deckId);
       const removedCards = cards.filter((c) => c.deckId === deckId);
       await Promise.all([dbDeleteDeck(deckId), deleteCardsByDeck(deckId)]);
-      setDecks((prev) => {
-        const nextAll = prev.filter((d) => d.id !== deckId);
-        if (selectedDeckId === deckId) {
-          const nextInLang = nextAll.find((d) => d.languageId === activeLanguage.id);
-          setSelectedDeckId(nextInLang?.id ?? '');
-        }
-        return nextAll;
-      });
+      const nextAll = decks.filter((d) => d.id !== deckId);
+      // Compute the fallback selection outside the state updater — updaters
+      // must stay pure (StrictMode may invoke them twice).
+      const nextSelectedDeckId =
+        selectedDeckId === deckId
+          ? (nextAll.find((d) => d.languageId === activeLanguage.id)?.id ?? '')
+          : selectedDeckId;
+      setDecks(nextAll);
+      setSelectedDeckId(nextSelectedDeckId);
       setCards((prev) => prev.filter((c) => c.deckId !== deckId));
       // Clear active session if it references the deleted deck
       if (activeSession && activeSession.deckIds.includes(deckId)) {
@@ -906,6 +908,9 @@ export default function App() {
   const handlePersistNote = useCallback(
     async (noteId: string, content: string) => {
       const existing = notes.find((n) => n.id === noteId);
+      // A pending autosave/unmount flush can fire after the note was deleted —
+      // persisting then would resurrect it as an orphaned record in IndexedDB.
+      if (!existing) return;
       const updated: Note = {
         id: noteId,
         title: existing?.title,
@@ -1251,46 +1256,84 @@ export default function App() {
 
   // Full workspace backup / restore
   const handleExportAllBackup = useCallback(() => {
-    exportFullBackupJson(
-      buildBackupPayload({
-        languages,
-        decks,
-        cards,
-        stats: studyStats,
-        activity,
-        notes,
-      })
-    );
-    notify('Backup exported as JSON', 'success');
-  }, [languages, decks, cards, studyStats, activity, notes, notify]);
+    void (async () => {
+      try {
+        // Fetch the complete session history — the `sessions` state only
+        // holds the most recent 50 records for the stats UI.
+        const allSessions = await getSessionHistory(500).catch(() => sessions);
+        exportFullBackupJson(
+          buildBackupPayload({
+            languages,
+            decks,
+            cards,
+            stats: studyStats,
+            activity,
+            notes,
+            smartDecks,
+            sessions: allSessions,
+          })
+        );
+        notify('Backup exported as JSON', 'success');
+      } catch {
+        notify('Could not export the backup. Please try again.', 'error');
+      }
+    })();
+  }, [languages, decks, cards, studyStats, activity, notes, smartDecks, sessions, notify]);
 
   const handleImportBackup = useCallback(
     async (rawText: string, mode: 'merge' | 'replace') => {
       const payload = parseBackupJson(rawText); // throws on invalid input
 
+      // Referential integrity: drop decks whose language is absent and cards
+      // whose deck is absent so a malformed/partial backup can't leave
+      // orphaned records behind. In merge mode, references to records that
+      // already exist locally are also valid.
+      const localDeckIds = new Set(decks.map((d) => d.id));
+      const localLanguageIds = new Set(languages.map((l) => l.id));
+      const validLanguageIds = new Set([
+        ...payload.languages.map((l) => l.id),
+        ...(mode === 'merge' ? localLanguageIds : []),
+      ]);
+      const validDecks = payload.decks.filter((d) =>
+        validLanguageIds.has(d.languageId)
+      );
+      const validDeckIds = new Set([
+        ...validDecks.map((d) => d.id),
+        ...(mode === 'merge' ? localDeckIds : []),
+      ]);
+      const validCards = payload.cards.filter((c) => validDeckIds.has(c.deckId));
+      const validSmartDecks = (payload.smartDecks ?? []).filter((s) =>
+        validLanguageIds.has(s.languageId)
+      );
+      const backupNotes = payload.notes ?? [];
+      const backupSessions = payload.sessions ?? [];
+
       if (mode === 'replace') {
-        await clearAllData();
-        await Promise.all([
-          ...payload.languages.map((l) => addLanguage(l)),
-          ...payload.decks.map((d) => addDeck(d)),
-          putCards(payload.cards),
-          ...(payload.notes ?? []).map((n) => putNote(n)),
-        ]);
-        if (payload.stats) await saveStats(payload.stats);
-        for (const day of payload.activity ?? []) {
-          await putActivityDay(day);
-        }
+        // Single transaction: the workspace is either fully restored or
+        // untouched — never a half-imported database.
+        await restoreBackupData({
+          languages: payload.languages,
+          decks: validDecks,
+          cards: validCards,
+          notes: backupNotes,
+          smartDecks: validSmartDecks,
+          sessions: backupSessions,
+          stats: payload.stats,
+          activity: payload.activity ?? [],
+        });
         // Prevent preset seed data from resurrecting on next launch
         await markSeedCompleted();
 
         setLanguages(payload.languages);
-        setDecks(payload.decks);
-        setCards(payload.cards);
+        setDecks(validDecks);
+        setCards(validCards);
+        setNotes(backupNotes);
+        setSmartDecks(validSmartDecks);
+        setSessions(backupSessions.slice(0, 50));
+        setActivity(payload.activity ?? []);
         if (payload.stats) {
           setStudyStats((prev) => ({ ...prev, ...payload.stats }));
         }
-        setActivity(payload.activity ?? []);
-        setNotes(payload.notes ?? []);
         setActiveSession(null);
         setQuizSetupOpen(false);
 
@@ -1300,26 +1343,39 @@ export default function App() {
             payload.languages.some((l) => l.id === prev) ? prev : firstLang.id
           );
           setSelectedDeckId((prev) =>
-            payload.decks.some((d) => d.id === prev) ? prev : payload.decks[0]?.id ?? ''
+            validDecks.some((d) => d.id === prev) ? prev : validDecks[0]?.id ?? ''
           );
+        } else {
+          setActiveLanguageId('');
+          setSelectedDeckId('');
         }
       } else {
         // Merge: upsert every record by id, keep unrelated data intact
         await Promise.all([
           ...payload.languages.map((l) => addLanguage(l)),
-          ...payload.decks.map((d) => addDeck(d)),
-          putCards(payload.cards),
-          ...(payload.notes ?? []).map((n) => putNote(n)),
+          ...validDecks.map((d) => addDeck(d)),
+          putCards(validCards),
+          ...backupNotes.map((n) => putNote(n)),
+          ...validSmartDecks.map((s) => addSmartDeck(s)),
         ]);
+        await putSessionRecords(backupSessions);
         for (const day of payload.activity ?? []) {
           await putActivityDay(day);
         }
 
         setLanguages((prev) => mergeById(prev, payload.languages));
-        setDecks((prev) => mergeById(prev, payload.decks));
-        setCards((prev) => mergeById(prev, payload.cards));
+        setDecks((prev) => mergeById(prev, validDecks));
+        setCards((prev) => mergeById(prev, validCards));
         if (payload.notes) {
-          setNotes((prev) => mergeById(prev, payload.notes ?? []));
+          setNotes((prev) => mergeById(prev, backupNotes));
+        }
+        if (payload.smartDecks) {
+          setSmartDecks((prev) => mergeById(prev, validSmartDecks));
+        }
+        if (payload.sessions) {
+          setSessions((prev) =>
+            mergeById(prev, backupSessions).slice(0, 50)
+          );
         }
         setActivity((prev) => {
           const incoming = payload.activity ?? [];
@@ -1329,11 +1385,11 @@ export default function App() {
       }
 
       notify(
-        `Backup ${mode === 'replace' ? 'restored' : 'merged'} — ${payload.languages.length} languages, ${payload.decks.length} decks, ${payload.cards.length} words`,
+        `Backup ${mode === 'replace' ? 'restored' : 'merged'} — ${payload.languages.length} languages, ${validDecks.length} decks, ${validCards.length} words`,
         'success'
       );
     },
-    [notify]
+    [notify, decks, languages]
   );
 
   // "?" toggles the keyboard shortcut cheat-sheet

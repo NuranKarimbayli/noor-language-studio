@@ -69,6 +69,12 @@ describe('applyStudyActivity', () => {
     const noAnswer = applyStudyActivity(baseStats());
     expect(noAnswer.totalQuizAnswered).toBe(0);
   });
+
+  it('preserves optional fields like dailyGoal across updates', () => {
+    const result = applyStudyActivity(baseStats({ dailyGoal: 50 }));
+    expect(result.dailyGoal).toBe(50);
+    expect(result.bestQuizStreak).toBe(0);
+  });
 });
 
 describe('parseImportedDeckJson', () => {
@@ -178,6 +184,55 @@ describe('parseBackupJson', () => {
     expect(parsed.decks).toHaveLength(1);
     expect(parsed.cards).toHaveLength(1);
     expect(parsed.cards[0].confidence).toBe('new'); // invalid confidence normalized
+  });
+
+  it('round-trips smart decks and session history', () => {
+    const withExtras = buildBackupPayload({
+      ...validPayload,
+      smartDecks: [
+        {
+          id: 'smart-1',
+          languageId: 'lang-1',
+          name: 'Leeches',
+          filter: { leeches: true },
+          createdAt: '2026-01-01T00:00:00.000Z',
+        } as never,
+      ],
+      sessions: [
+        {
+          id: 'sess-1',
+          mode: 'multiple-choice',
+          deckIds: ['deck-1'],
+          deckNames: ['Basics'],
+          total: 10,
+          correct: 8,
+          durationMs: 60000,
+          completedAt: '2026-11-20T10:00:00.000Z',
+        },
+      ],
+    });
+    const parsed = parseBackupJson(JSON.stringify(withExtras));
+    expect(parsed.smartDecks).toHaveLength(1);
+    expect(parsed.sessions).toHaveLength(1);
+    expect(parsed.sessions?.[0].correct).toBe(8);
+  });
+
+  it('accepts backups that contain only notes or smart decks', () => {
+    const notesOnly = parseBackupJson(
+      JSON.stringify({
+        notes: [{ id: 'n1', content: 'hello', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      })
+    );
+    expect(notesOnly.notes).toHaveLength(1);
+
+    const smartOnly = parseBackupJson(
+      JSON.stringify({
+        smartDecks: [
+          { id: 's1', languageId: 'l1', name: 'X', filter: { due: true } },
+        ],
+      })
+    );
+    expect(smartOnly.smartDecks).toHaveLength(1);
   });
 
   it('throws on invalid JSON and empty backups', () => {

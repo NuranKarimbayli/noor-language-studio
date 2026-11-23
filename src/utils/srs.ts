@@ -35,7 +35,7 @@ export function isWeakCard(card: VocabCard): boolean {
   if (card.confidence === 'hard') return true;
   const box = inferSrsBox(card);
   if ((card.lapses ?? 0) > 0 && box <= 2) return true;
-  if (card.reviewCount > 0 && box <= 2) return true;
+  if ((card.reviewCount ?? 0) > 0 && box <= 2) return true;
   return false;
 }
 
@@ -264,9 +264,17 @@ export function getReviewForecast(
 ): ReviewForecast {
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = startOfToday.getTime() + 24 * 60 * 60 * 1000;
-  const endOfTomorrow = endOfToday + 24 * 60 * 60 * 1000;
-  const endOfWeek = startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000;
+  // Calendar-day boundaries via setDate — fixed +24h arithmetic drifts by an
+  // hour across DST transitions and mis-buckets reviews near midnight.
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+  const startOfDayAfterTomorrow = new Date(startOfTomorrow);
+  startOfDayAfterTomorrow.setDate(startOfDayAfterTomorrow.getDate() + 1);
+  const startOfNextWeek = new Date(startOfToday);
+  startOfNextWeek.setDate(startOfNextWeek.getDate() + 7);
+  const endOfToday = startOfTomorrow.getTime();
+  const endOfTomorrow = startOfDayAfterTomorrow.getTime();
+  const endOfWeek = startOfNextWeek.getTime();
 
   let today = 0;
   let tomorrow = 0;

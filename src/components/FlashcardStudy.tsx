@@ -112,6 +112,13 @@ export function FlashcardStudy({
 
   // Reset session when config changes
   useEffect(() => {
+    // A pending post-rating advance must not fire into the new session —
+    // it would skip a card or instantly complete the fresh queue.
+    if (rateTimeoutRef.current !== null) {
+      window.clearTimeout(rateTimeoutRef.current);
+      rateTimeoutRef.current = null;
+    }
+    advanceLockRef.current = false;
     setOnlyHardMode(false);
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -203,7 +210,15 @@ export function FlashcardStudy({
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionComplete(false);
+    // Mirror restartSession: ratings, timing, and the completion-report guard
+    // all belong to the queue being studied — without this a second finished
+    // session would never be recorded in history.
+    setSessionRatings({ hard: 0, good: 0, easy: 0 });
+    setRatingPulse(null);
     setSessionSeed((s) => s + 1);
+    sessionStartRef.current = performance.now();
+    completionReportedRef.current = false;
+    leechStreakRef.current = new Map();
   };
 
   const goToIndex = useCallback(
@@ -614,7 +629,7 @@ export function FlashcardStudy({
                 }`}
               >
                 {/* Front Face */}
-                <div className="absolute inset-0 backface-hidden bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm">
+                <div className="absolute inset-0 backface-hidden bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm transition-shadow duration-300 hover:shadow-md">
                   <div className="flex items-center justify-between text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
                     <span>
                       {currentItem.promptSide === 'word'
@@ -660,7 +675,7 @@ export function FlashcardStudy({
                 </div>
 
                 {/* Back Face */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-[#FAF8F5] dark:bg-[#1E1B18] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm">
+                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-[#FAF8F5] dark:bg-[#1E1B18] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm transition-shadow duration-300 hover:shadow-md">
                   <div className="flex items-center justify-between text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
                     <span>
                       {currentItem.promptSide === 'word' ? 'Translation' : 'Word'}

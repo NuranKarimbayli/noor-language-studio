@@ -114,6 +114,16 @@ describe('createBlankedSentence', () => {
     expect(result!.matchedToken).toBe('kalba');
   });
 
+  it('prefers the strongest stem candidate over sentence order', () => {
+    // Both "namelis" and "namo" share a 3-char prefix with "namas", but
+    // "namo" is the closer inflection — it must win even though "namelis"
+    // appears first in the sentence.
+    const result = createBlankedSentence('Namelis pamatė namo.', 'namas');
+    expect(result).not.toBeNull();
+    expect(result!.matchedToken).toBe('namo');
+    expect(result!.blanked).toBe('Namelis pamatė _____.');
+  });
+
   it('returns null when the target does not appear', () => {
     expect(createBlankedSentence('Labas rytas', 'vanduo')).toBeNull();
     expect(createBlankedSentence('', 'labas')).toBeNull();

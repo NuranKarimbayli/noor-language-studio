@@ -602,6 +602,24 @@ export async function addSessionRecord(record: SessionRecord): Promise<void> {
   await tx.done;
 }
 
+/** Bulk-upsert session records (backup merge/restore) with one prune pass. */
+export async function putSessionRecords(records: SessionRecord[]): Promise<void> {
+  if (records.length === 0) return;
+  const db = await getDB();
+  const tx = db.transaction('sessions', 'readwrite');
+  for (const record of records) {
+    tx.store.put(record);
+  }
+  const all = await tx.store.getAll();
+  if (all.length > MAX_SESSION_RECORDS) {
+    const oldest = all
+      .sort((a, b) => a.completedAt.localeCompare(b.completedAt))
+      .slice(0, all.length - MAX_SESSION_RECORDS);
+    await Promise.all(oldest.map((r) => tx.store.delete(r.id)));
+  }
+  await tx.done;
+}
+
 // Smart decks (saved dynamic filters)
 export async function getSmartDecks(): Promise<SmartDeck[]> {
   const db = await getDB();
@@ -620,10 +638,14 @@ export async function deleteSmartDeck(smartDeckId: string): Promise<void> {
 
 export async function deleteSmartDecksByLanguage(languageId: string): Promise<void> {
   const db = await getDB();
-  const all = await db.getAll('smartDecks');
+  const tx = db.transaction('smartDecks', 'readwrite');
+  const all = await tx.store.getAll();
   await Promise.all(
-    all.filter((s) => s.languageId === languageId).map((s) => db.delete('smartDecks', s.id))
+    all
+      .filter((s) => s.languageId === languageId)
+      .map((s) => tx.store.delete(s.id))
   );
+  await tx.done;
 }
 
 /**
@@ -646,6 +668,50 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('meta').clear(),
     tx.objectStore('notes').clear(),
   ]);
+  await tx.done;
+}
+
+/**
+ * Atomic full-workspace restore: clears all content stores and writes the
+ * backup payload inside a single transaction, so a failure mid-restore can
+ * never leave a half-imported database. Preference stores (theme, mute
+ * flags, meta/appPrefs) are intentionally preserved — restoring a backup
+ * shouldn't reset the user's UI settings.
+ */
+export async function restoreBackupData(data: {
+  languages: LanguageItem[];
+  decks: Deck[];
+  cards: VocabCard[];
+  notes?: Note[];
+  smartDecks?: SmartDeck[];
+  sessions?: SessionRecord[];
+  stats?: StudyStats;
+  activity?: ActivityDay[];
+}): Promise<void> {
+  const db = await getDB();
+  const contentStores = [
+    'languages',
+    'decks',
+    'cards',
+    'stats',
+    'activity',
+    'sessions',
+    'smartDecks',
+    'notes',
+  ] as const;
+  const tx = db.transaction([...contentStores], 'readwrite');
+
+  await Promise.all(contentStores.map((name) => tx.objectStore(name).clear()));
+
+  for (const item of data.languages) tx.objectStore('languages').put(item);
+  for (const item of data.decks) tx.objectStore('decks').put(item);
+  for (const item of data.cards) tx.objectStore('cards').put(item);
+  for (const item of data.notes ?? []) tx.objectStore('notes').put(item);
+  for (const item of data.smartDecks ?? []) tx.objectStore('smartDecks').put(item);
+  for (const item of data.activity ?? []) tx.objectStore('activity').put(item);
+  for (const item of data.sessions ?? []) tx.objectStore('sessions').put(item);
+  if (data.stats) tx.objectStore('stats').put(data.stats, 'main');
+
   await tx.done;
 }
 

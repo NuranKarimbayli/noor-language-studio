@@ -838,10 +838,10 @@ export function DeckWorkspace({
                       setSelectedSmartDeckId(sd.id);
                     }
                   }}
-                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all ${
+                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all duration-200 ease-out ${
                     active
-                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-xs'
-                      : 'bg-[#FBF7F0]/70 dark:bg-[#1A1714] border-slate-200 dark:border-[#2E2A25] hover:border-[#D97706]/60 dark:hover:border-[#D97706]/40'
+                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-sm ring-1 ring-[#B45309]/20 dark:ring-[#D97706]/25'
+                      : 'bg-[#FBF7F0]/70 dark:bg-[#1A1714] border-slate-200 dark:border-[#2E2A25] hover:border-[#D97706]/60 dark:hover:border-[#D97706]/40 hover:-translate-y-0.5 hover:shadow-md'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -886,10 +886,10 @@ export function DeckWorkspace({
                       handleSelectDeckCard(deck.id);
                     }
                   }}
-                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all ${
+                  className={`group relative text-left rounded-2xl p-4 sm:p-5 border cursor-pointer transition-all duration-200 ease-out ${
                     active
-                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-xs'
-                      : 'bg-white/70 dark:bg-[#171513] border-slate-200 dark:border-[#2E2A25] hover:border-slate-300 dark:hover:border-[#443E37]'
+                      ? 'bg-white dark:bg-[#1C1A17] border-[#B45309] dark:border-[#D97706] shadow-sm ring-1 ring-[#B45309]/20 dark:ring-[#D97706]/25'
+                      : 'bg-white/70 dark:bg-[#171513] border-slate-200 dark:border-[#2E2A25] hover:border-[#B45309]/50 dark:hover:border-[#D97706]/40 hover:-translate-y-0.5 hover:shadow-md'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">

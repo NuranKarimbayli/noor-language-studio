@@ -5,6 +5,8 @@ import {
   DifficultyLevel,
   LanguageItem,
   Note,
+  SessionRecord,
+  SmartDeck,
   StudyStats,
   VocabCard,
 } from '../types';
@@ -42,6 +44,9 @@ export function applyStudyActivity(
   }
 
   return {
+    // Spread first so optional fields like dailyGoal survive every update —
+    // rebuilding the object field-by-field used to silently drop them.
+    ...current,
     streakDays: nextStreak,
     lastStudyDate: today,
     totalQuizAnswered: current.totalQuizAnswered + (quizIncrement ? 1 : 0),
@@ -249,6 +254,8 @@ export interface FullBackupPayload {
   stats?: StudyStats;
   activity?: ActivityDay[];
   notes?: Note[];
+  smartDecks?: SmartDeck[];
+  sessions?: SessionRecord[];
 }
 
 export function buildBackupPayload(input: {
@@ -258,6 +265,8 @@ export function buildBackupPayload(input: {
   stats?: StudyStats;
   activity?: ActivityDay[];
   notes?: Note[];
+  smartDecks?: SmartDeck[];
+  sessions?: SessionRecord[];
 }): FullBackupPayload {
   return {
     version: 1,
@@ -268,6 +277,8 @@ export function buildBackupPayload(input: {
     stats: input.stats,
     activity: input.activity,
     notes: input.notes,
+    smartDecks: input.smartDecks,
+    sessions: input.sessions,
   };
 }
 
@@ -302,6 +313,37 @@ function isValidDeck(item: unknown): item is Deck {
     typeof item === 'object' &&
     typeof (item as Deck).id === 'string' &&
     typeof (item as Deck).languageId === 'string'
+  );
+}
+
+function isValidNote(item: unknown): item is Note {
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    typeof (item as Note).id === 'string' &&
+    typeof (item as Note).content === 'string'
+  );
+}
+
+function isValidSmartDeck(item: unknown): item is SmartDeck {
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    typeof (item as SmartDeck).id === 'string' &&
+    typeof (item as SmartDeck).languageId === 'string' &&
+    !!(item as SmartDeck).filter &&
+    typeof (item as SmartDeck).filter === 'object'
+  );
+}
+
+function isValidSessionRecord(item: unknown): item is SessionRecord {
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    typeof (item as SessionRecord).id === 'string' &&
+    typeof (item as SessionRecord).mode === 'string' &&
+    typeof (item as SessionRecord).completedAt === 'string' &&
+    typeof (item as SessionRecord).total === 'number'
   );
 }
 
@@ -360,17 +402,26 @@ export function parseBackupJson(rawText: string): FullBackupPayload {
     : undefined;
 
   const notes = Array.isArray(source.notes)
-    ? (source.notes as unknown[]).filter(
-        (n): n is Note =>
-          !!n &&
-          typeof n === 'object' &&
-          typeof (n as Note).id === 'string' &&
-          typeof (n as Note).content === 'string'
-      )
+    ? (source.notes as unknown[]).filter(isValidNote)
     : undefined;
 
-  if (languages.length === 0 && decks.length === 0 && cards.length === 0) {
-    throw new Error('No valid languages, decks, or cards found in this backup.');
+  const smartDecks = Array.isArray(source.smartDecks)
+    ? (source.smartDecks as unknown[]).filter(isValidSmartDeck)
+    : undefined;
+
+  const sessions = Array.isArray(source.sessions)
+    ? (source.sessions as unknown[]).filter(isValidSessionRecord)
+    : undefined;
+
+  if (
+    languages.length === 0 &&
+    decks.length === 0 &&
+    cards.length === 0 &&
+    !(notes && notes.length > 0) &&
+    !(smartDecks && smartDecks.length > 0) &&
+    !(sessions && sessions.length > 0)
+  ) {
+    throw new Error('No valid data found in this backup file.');
   }
 
   return {
@@ -382,5 +433,7 @@ export function parseBackupJson(rawText: string): FullBackupPayload {
     stats,
     activity,
     notes,
+    smartDecks,
+    sessions,
   };
 }

@@ -170,13 +170,28 @@ export function QuizSetupModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
+  const selectedDeckIdSet = useMemo(
+    () => new Set(selectedDeckIds),
+    [selectedDeckIds]
+  );
+
   const selectedCards = useMemo(
     () =>
       cards.filter(
-        (c) => selectedDeckIds.includes(c.deckId) && !c.suspended
+        (c) => selectedDeckIdSet.has(c.deckId) && !c.suspended
       ),
-    [cards, selectedDeckIds]
+    [cards, selectedDeckIdSet]
   );
+
+  // Per-deck card counts in one pass — filtering `cards` per deck row was
+  // O(decks × cards) on every render.
+  const cardCountByDeckId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of cards) {
+      counts.set(c.deckId, (counts.get(c.deckId) ?? 0) + 1);
+    }
+    return counts;
+  }, [cards]);
 
   const difficultyFilteredCards = useMemo(
     () =>
@@ -327,11 +342,11 @@ export function QuizSetupModal({
                   disabled={optionDisabled}
                   title={disabledHint}
                   onClick={() => setMode(opt.id)}
-                  className={`text-left p-3.5 rounded-xl border transition-all flex flex-col gap-2 ${
+                  className={`text-left p-3.5 rounded-xl border transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md flex flex-col gap-2 ${
                     optionDisabled ? 'opacity-50 cursor-not-allowed' : ''
                   } ${
                     active
-                      ? 'border-[#B45309] dark:border-[#D97706] bg-[#FAF8F5] dark:bg-[#25221E]'
+                      ? 'border-[#B45309] dark:border-[#D97706] bg-[#FAF8F5] dark:bg-[#25221E] shadow-sm'
                       : 'border-slate-200 dark:border-[#2E2A25] bg-white dark:bg-[#1C1A17] hover:border-slate-300 dark:hover:border-[#443E37]'
                   }`}
                 >
@@ -411,8 +426,8 @@ export function QuizSetupModal({
           ) : (
             <div className="max-h-40 overflow-y-auto divide-y divide-slate-200 dark:divide-[#2E2A25] border border-slate-200 dark:border-[#2E2A25] rounded-xl [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]">
               {decks.map((deck) => {
-                const count = cards.filter((c) => c.deckId === deck.id).length;
-                const checked = selectedDeckIds.includes(deck.id);
+                const count = cardCountByDeckId.get(deck.id) ?? 0;
+                const checked = selectedDeckIdSet.has(deck.id);
                 return (
                   <label
                     key={deck.id}

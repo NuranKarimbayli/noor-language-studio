@@ -66,7 +66,7 @@ export function QuizLauncher({
             type="button"
             onClick={onSmartReview}
             disabled={!hasCards}
-            className="text-left px-4 py-3.5 rounded-xl border border-[#B45309]/40 dark:border-[#D97706]/40 bg-[#B45309]/5 dark:bg-[#D97706]/10 hover:bg-[#B45309]/10 dark:hover:bg-[#D97706]/15 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="text-left px-4 py-3.5 rounded-xl border border-[#B45309]/40 dark:border-[#D97706]/40 bg-[#B45309]/5 dark:bg-[#D97706]/10 hover:bg-[#B45309]/10 dark:hover:bg-[#D97706]/15 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out disabled:opacity-40 disabled:pointer-events-none"
           >
             <div className="flex items-center gap-2 text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
               <Zap className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B]" />
@@ -81,7 +81,7 @@ export function QuizLauncher({
             type="button"
             onClick={onDueReview}
             disabled={dueCount === 0}
-            className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-amber-400 dark:hover:border-amber-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-amber-400 dark:hover:border-amber-700 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out disabled:opacity-40 disabled:pointer-events-none"
           >
             <div className="flex items-center gap-2 text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
               <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -101,7 +101,7 @@ export function QuizLauncher({
             type="button"
             onClick={onLeechLab}
             disabled={leechCount === 0}
-            className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-amber-400 dark:hover:border-amber-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-amber-400 dark:hover:border-amber-700 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out disabled:opacity-40 disabled:pointer-events-none"
           >
             <div className="flex items-center gap-2 text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
               <Bug className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -147,7 +147,7 @@ export function QuizLauncher({
                       ? 'Requires a supported browser voice for this language'
                       : undefined
                 }
-                className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-[#B45309] dark:hover:border-[#D97706] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors disabled:opacity-50 disabled:pointer-events-none flex flex-col gap-2"
+                className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-[#B45309] dark:hover:border-[#D97706] hover:bg-white dark:hover:bg-[#1C1A17] hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none flex flex-col gap-2"
               >
                 <div className="flex items-center gap-2">
                   <Icon className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />

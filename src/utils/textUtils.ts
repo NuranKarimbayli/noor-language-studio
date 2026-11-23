@@ -209,6 +209,10 @@ export function createBlankedSentence(
   const lowerWord = cleanWord.toLowerCase();
   if (lowerWord.length >= 4 && !lowerWord.includes(' ')) {
     const minPrefix = Math.max(3, Math.floor(lowerWord.length * 0.55));
+    // Pick the strongest candidate — longest shared prefix, ties broken by
+    // the shortest token — instead of the first token in sentence order,
+    // which could blank a merely-similar word that appears earlier.
+    let best: { token: string; index: number; common: number } | null = null;
     for (const match of tokens) {
       const token = match[0];
       const lowerToken = token.toLowerCase();
@@ -217,11 +221,19 @@ export function createBlankedSentence(
       while (common < limit && lowerWord[common] === lowerToken[common]) {
         common++;
       }
-      if (common >= minPrefix && match.index !== undefined) {
-        const before = cleanSentence.slice(0, match.index);
-        const after = cleanSentence.slice(match.index + token.length);
-        return { blanked: `${before}_____${after}`, matchedToken: token };
+      if (common < minPrefix || match.index === undefined) continue;
+      if (
+        !best ||
+        common > best.common ||
+        (common === best.common && token.length < best.token.length)
+      ) {
+        best = { token, index: match.index, common };
       }
+    }
+    if (best) {
+      const before = cleanSentence.slice(0, best.index);
+      const after = cleanSentence.slice(best.index + best.token.length);
+      return { blanked: `${before}_____${after}`, matchedToken: best.token };
     }
   }
 

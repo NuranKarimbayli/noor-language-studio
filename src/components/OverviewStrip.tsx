@@ -147,7 +147,7 @@ export function OverviewStrip({
               type="button"
               disabled={cards.length === 0}
               onClick={onStartSmartReview}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#25221E] border border-[#B45309]/40 dark:border-[#D97706]/50 hover:bg-[#B45309] hover:text-white dark:hover:bg-[#D97706] dark:hover:text-[#121110] text-xs sm:text-sm font-semibold text-[#B45309] dark:text-[#F59E0B] transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#25221E] border border-[#B45309]/40 dark:border-[#D97706]/50 hover:bg-[#B45309] hover:text-white dark:hover:bg-[#D97706] dark:hover:text-[#121110] hover:-translate-y-px hover:shadow-md text-xs sm:text-sm font-semibold text-[#B45309] dark:text-[#F59E0B] transition-all duration-200 ease-out whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
             >
               <Zap className="w-3.5 h-3.5" />
               <span>{weakCount > 0 ? `Weak Words (${weakCount})` : 'Smart Review'}</span>
@@ -156,7 +156,7 @@ export function OverviewStrip({
         </div>
 
         {/* Right column: Word of the Day Minimalist Widget */}
-        <div className="md:col-span-5 bg-gradient-to-br from-white to-[#FAF6EE] dark:from-[#1C1A17] dark:to-[#181512] border border-[#B45309]/25 dark:border-[#D97706]/30 rounded-2xl p-5 flex flex-col justify-between gap-3">
+        <div className="md:col-span-5 bg-gradient-to-br from-white to-[#FAF6EE] dark:from-[#1C1A17] dark:to-[#181512] border border-[#B45309]/25 dark:border-[#D97706]/30 rounded-2xl p-5 flex flex-col justify-between gap-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#B45309]/50 dark:hover:border-[#D97706]/50">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[#B45309] dark:text-[#F59E0B]">
               Word of the Day
@@ -208,7 +208,7 @@ export function OverviewStrip({
       {/* Row 2: 4 Compact Progress & Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Words */}
-        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2">
+        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
             Total Words
           </span>
@@ -221,7 +221,7 @@ export function OverviewStrip({
         </div>
 
         {/* Card 2: Mastery / Progress */}
-        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2">
+        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
               Mastery
@@ -250,7 +250,7 @@ export function OverviewStrip({
         </div>
 
         {/* Card 3: Study Streak & Accuracy */}
-        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2">
+        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
             Study Streak &amp; Accuracy
           </span>
@@ -276,7 +276,7 @@ export function OverviewStrip({
         </div>
 
         {/* Card 4: Review Forecast */}
-        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2">
+        <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
               Review Forecast

@@ -53,6 +53,37 @@
   [aria-disabled="true"] {
     cursor: not-allowed;
   }
+
+  /* Consistent micro-interaction defaults:
+     - Interactive elements without an explicit `transition-*` utility still
+       animate color/opacity/shadow/border changes smoothly (150ms ease-out).
+       Elements that DO declare a Tailwind transition keep their own spec.
+     - Inputs get smooth focus-ring (box-shadow) transitions as well. */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="switch"],
+  [role="option"],
+  [role="menuitem"],
+  select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea {
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+
+  /* Tactile micro-press: a subtle 2% scale-down while active.
+     Uses the standalone `scale` property so it composes safely with
+     `transform` animations (3D flips) and motion/react inline transforms.
+     Excludes the flashcard flip surface, full-width switch rows, and any
+     element opting out via `.no-press` / `data-no-press`. */
+  :is(button, [role="button"], [role="option"], [role="menuitem"]):not(
+      :disabled
+    ):not([aria-disabled="true"]):not(.flashcard-inner):not(.no-press):not(
+      [data-no-press]
+    ):not([role="switch"]):not([role="tab"]):active {
+    scale: 0.98;
+  }
 }
 
 .perspective-1200 {
@@ -207,6 +238,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Global catch-all: collapse every CSS animation/transition so the UI is
+     fully usable without motion. JS-driven (motion/react) animations are
+     unaffected and remain instantaneous-feeling via their own durations. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   .flashcard-inner {
     transition-duration: 0.01ms !important;
   }

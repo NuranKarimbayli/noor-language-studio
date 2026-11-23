@@ -199,6 +199,24 @@ export function QuizCenter({
       // Leitner Spaced Repetition priority queue: struggling / due words come first
       const pool = sortCardsBySrsPriority(sourceCards).slice(0, config.questionCount);
 
+      // Hoist per-build invariants out of the per-question loop — rebuilding
+      // these sets/filters for every card was O(questions × totalCards).
+      const sourceIdSet = new Set(sourceCards.map((c) => c.id));
+      const cardsByDeckId = new Map<string, VocabCard[]>();
+      const nonSourceCards: VocabCard[] = [];
+      for (const c of cards) {
+        if (!sourceIdSet.has(c.id)) nonSourceCards.push(c);
+        const list = cardsByDeckId.get(c.deckId);
+        if (list) list.push(c);
+        else cardsByDeckId.set(c.deckId, [c]);
+      }
+      const isolateByDeck = config.isolateDistractorsByDeck !== false;
+      // Non-isolated mode draws from the same mixed pool for every question;
+      // shuffle once and just exclude the question card per iteration.
+      const mixedPool = isolateByDeck
+        ? null
+        : shuffleList([...sourceCards, ...nonSourceCards]);
+
       return pool.map((card, index) => {
         const deck = deckMap.get(card.deckId);
         const deckName = deck?.name ?? 'Deck';
@@ -245,26 +263,25 @@ export function QuizCenter({
         // so the question card's own deck is exhausted first, then other
         // in-scope decks, and only then unrelated decks — preventing obvious
         // cross-category spoilers. When disabled, all selected decks are mixed.
-        const isolateByDeck = config.isolateDistractorsByDeck !== false;
-        const sourceIdSet = new Set(sourceCards.map((c) => c.id));
         let distractorCandidates: VocabCard[];
         if (isolateByDeck) {
           const sameDeckPool = shuffleList(
-            cards.filter((o) => o.id !== card.id && o.deckId === card.deckId)
+            (cardsByDeckId.get(card.deckId) ?? []).filter((o) => o.id !== card.id)
           );
-          const sameDeckIds = new Set(sameDeckPool.map((c) => c.id));
           const fallbackPool = shuffleList([
-            ...sourceCards.filter((o) => o.id !== card.id && !sameDeckIds.has(o.id)),
-            ...cards.filter(
-              (o) => o.id !== card.id && o.deckId !== card.deckId && !sourceIdSet.has(o.id)
+            ...sourceCards.filter(
+              (o) => o.id !== card.id && o.deckId !== card.deckId
+            ),
+            ...nonSourceCards.filter(
+              (o) => o.id !== card.id && o.deckId !== card.deckId
             ),
           ]);
           distractorCandidates = [...sameDeckPool, ...fallbackPool];
         } else {
-          distractorCandidates = shuffleList([
-            ...sourceCards.filter((o) => o.id !== card.id),
-            ...cards.filter((o) => o.id !== card.id && !sourceIdSet.has(o.id)),
-          ]);
+          // Reshuffle per question so distractor picks vary across the quiz
+          distractorCandidates = shuffleList(mixedPool ?? []).filter(
+            (o) => o.id !== card.id
+          );
         }
 
         // True / False mode: ~50% matching pair, ~50% plausible mismatch
@@ -298,11 +315,18 @@ export function QuizCenter({
         let options: string[] | undefined;
         if (config.mode === 'multiple-choice' || config.mode === 'listening') {
           const candidateValues = new Set<string>();
+          const seenKeys = new Set<string>();
 
           for (const other of distractorCandidates) {
             const val =
               resolvedDirection === 'word-to-translation' ? other.translation : other.word;
-            if (val.toLowerCase() !== expectedAnswer.toLowerCase()) {
+            const key = val.toLowerCase();
+            // Dedupe case-insensitively so "Hello"/"hello" can't both appear
+            if (
+              key !== expectedAnswer.toLowerCase() &&
+              !seenKeys.has(key)
+            ) {
+              seenKeys.add(key);
               candidateValues.add(val);
             }
             if (candidateValues.size >= 3) break;
@@ -569,8 +593,12 @@ export function QuizCenter({
   const handleTypedSubmit = useCallback(
     (e?: FormEvent) => {
       if (e) e.preventDefault();
-      if (!currentQuestion || currentRecord) return;
+      // Same submission lock as the click handlers — without it a fast
+      // double-submit (Enter + button, or rapid clicks) records the answer
+      // twice, double-applying the SRS outcome and activity stats.
+      if (!currentQuestion || currentRecord || submissionLockRef.current) return;
       if (!typedAnswer.trim()) return;
+      submissionLockRef.current = true;
 
       const extraAccepted =
         sessionConfig.mode === 'fill-blank' ? [currentQuestion.card.word] : undefined;
@@ -594,6 +622,9 @@ export function QuizCenter({
         evaluation.status === 'exact'
       );
       triggerFeedback(evaluation.isCorrect);
+      setTimeout(() => {
+        submissionLockRef.current = false;
+      }, 300);
     },
     [currentQuestion, currentRecord, typedAnswer, sessionConfig.mode, onRecordAnswer, triggerFeedback]
   );
@@ -1264,7 +1295,7 @@ export function QuizCenter({
                         type="button"
                         disabled={Boolean(currentRecord)}
                         onClick={() => handleTrueFalseSelect(btn.value)}
-                        className={`py-4 px-4 rounded-xl border text-base font-semibold flex items-center justify-center gap-2.5 transition-colors ${style}`}
+                        className={`py-4 px-4 rounded-xl border text-base font-semibold flex items-center justify-center gap-2.5 transition-all duration-150 ease-out enabled:hover:shadow-md enabled:hover:-translate-y-0.5 ${style}`}
                       >
                         <span>{btn.label}</span>
                         <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-[#78716C]">
@@ -1378,7 +1409,7 @@ export function QuizCenter({
                         ? 'Replay pronunciation'
                         : 'Voice not supported for this language'
                     }
-                    className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#B45309] hover:bg-[#92400E] text-white transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#B45309] hover:bg-[#92400E] hover:scale-105 text-white transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none"
                   >
                     <Volume2 className="w-7 h-7" />
                   </button>
@@ -1469,7 +1500,7 @@ export function QuizCenter({
                       type="button"
                       disabled={Boolean(currentRecord)}
                       onClick={() => handleMultipleChoiceSelect(opt)}
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border text-left text-sm sm:text-base font-medium transition-colors ${btnStyle}`}
+                      className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border text-left text-sm sm:text-base font-medium transition-all duration-150 ease-out enabled:hover:shadow-md enabled:hover:-translate-y-0.5 ${btnStyle}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="font-mono text-xs px-2 py-0.5 rounded bg-white/80 dark:bg-[#1C1A17]/80 border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] shrink-0">
@@ -1674,8 +1705,15 @@ export function QuizCenter({
             <button
               type="button"
               onClick={() => {
-                const missedCards = missedRecords.map((r) => r.question.card);
-                startWithPool(missedCards, missedCards.length);
+                // Route through the same eligibility filter as session start —
+                // e.g. fill-blank cards without a usable example sentence
+                // would otherwise produce broken un-blanked questions.
+                const missedCards = missedRecords
+                  .map((r) => r.question.card)
+                  .filter((c) => !c.suspended);
+                const eligible = getEligiblePool(missedCards, sessionConfig.mode);
+                if (eligible.length === 0) return;
+                startWithPool(eligible, eligible.length);
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
             >
