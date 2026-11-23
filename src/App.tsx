@@ -2437,13 +2437,6 @@ export default function App() {
         canInstallApp={installPrompt !== null}
         onInstallApp={handleInstallApp}
         lastBackupAt={appPrefs.lastBackupAt}
-        languages={languages}
-        activeLanguageId={activeLanguage.id}
-        onSelectLanguage={(languageId) => {
-          if (languageId === activeLanguage.id) return;
-          handleEnterLanguage(languageId);
-          setSettingsOpen(false);
-        }}
         uiLanguage={appPrefs.uiLanguage ?? 'en'}
         onUiLanguageChange={(lang) =>
           setAppPrefs((prev) => ({ ...prev, uiLanguage: lang }))

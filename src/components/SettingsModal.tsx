@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
-  Check,
   Download,
   FastForward,
   Keyboard,
@@ -15,7 +14,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { LanguageItem, ThemeMode } from '../types';
+import { ThemeMode } from '../types';
 import { Modal } from './Modal';
 import { t, UI_LANGUAGES, UiLanguage } from '../i18n';
 
@@ -49,9 +48,6 @@ interface SettingsModalProps {
   canInstallApp?: boolean;
   onInstallApp?: () => void;
   lastBackupAt?: string;
-  languages?: LanguageItem[];
-  activeLanguageId?: string;
-  onSelectLanguage?: (languageId: string) => void;
   uiLanguage?: UiLanguage;
   onUiLanguageChange?: (lang: UiLanguage) => void;
 }
@@ -151,9 +147,6 @@ export function SettingsModal({
   canInstallApp = false,
   onInstallApp,
   lastBackupAt,
-  languages = [],
-  activeLanguageId = '',
-  onSelectLanguage,
   uiLanguage = 'en',
   onUiLanguageChange,
 }: SettingsModalProps) {
@@ -235,47 +228,6 @@ export function SettingsModal({
                 {t('Interface text language for menus, buttons, and labels.')}
               </p>
             </div>
-          </Section>
-        )}
-
-        {/* Study language */}
-        {languages.length > 0 && onSelectLanguage && (
-          <Section icon={Languages} title={t('Study language')}>
-            <div className="py-2 space-y-1">
-              {languages.map((lang) => {
-                const isActive = lang.id === activeLanguageId;
-                return (
-                  <button
-                    key={lang.id}
-                    type="button"
-                    onClick={() => onSelectLanguage(lang.id)}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      isActive
-                        ? 'bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#1C1917] dark:text-[#F5F2EC]'
-                        : 'text-[#44403C] dark:text-[#D6D3D1] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <span className="font-medium truncate">{lang.name}</span>
-                      <span className="text-xs text-[#78716C] dark:text-[#A8A29E] truncate">
-                        {lang.nativeLabel}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] font-mono uppercase tracking-wide text-[#A8A29E] dark:text-[#78716C]">
-                        {lang.code}
-                      </span>
-                      {isActive && (
-                        <Check className="w-4 h-4 text-[#B45309] dark:text-[#D97706]" />
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed px-1 pb-1">
-              {t('Switch the active language — decks, words, and study sessions follow your selection.')}
-            </p>
           </Section>
         )}
 

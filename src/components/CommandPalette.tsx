@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  X,
   Zap,
 } from 'lucide-react';
 import { Deck, Note, VocabCard } from '../types';
@@ -200,8 +201,24 @@ export function CommandPalette({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       activate(items[activeIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
     }
   };
+
+  // Global Escape closes the palette even when focus isn't in the input
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   // Keep the active row scrolled into view
   useEffect(() => {
@@ -235,6 +252,15 @@ export function CommandPalette({
           <kbd className="hidden sm:inline font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E] text-[#78716C] dark:text-[#A8A29E]">
             esc
           </kbd>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('Close')}
+            title={t('Close')}
+            className="p-1.5 rounded-lg text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         <div
