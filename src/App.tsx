@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { CommandPalette, type PaletteActionId } from './components/CommandPalette';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlashcardStudy } from './components/FlashcardStudy';
@@ -16,6 +17,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/Toast';
+import { WordOfTheDay } from './components/WordOfTheDay';
 import { PRESET_LANGUAGES, SEED_CARDS, SEED_DECKS } from './data/seedDecks';
 import {
   ActivityDay,
@@ -25,12 +27,15 @@ import {
   Deck,
   DifficultyLevel,
   LanguageItem,
+  MasterySnapshot,
   Note,
   QuizMode,
+  QuizResumeState,
   QuizSessionSummary,
   SessionCompletionSummary,
   SessionConfig,
   SessionMode,
+  FlashcardResumeState,
   SessionRecord,
   SmartDeck,
   SmartDeckFilter,
@@ -44,6 +49,7 @@ import { cleanupAudioContext } from './utils/soundEffects';
 import { preloadVoices, stopSpeaking } from './utils/speechUtils';
 import {
   applySrsOutcome,
+  getDeckMastery,
   getReviewForecast,
   getSmartDeckCards,
   getSmartReviewCards,
@@ -51,6 +57,13 @@ import {
   isCardDue,
   isLeechCard,
 } from './utils/srs';
+import {
+  clearAllResumeSessions,
+  clearFlashcardResume,
+  clearQuizResume,
+  loadFlashcardResume,
+  loadQuizResume,
+} from './utils/sessionResume';
 import {
   applyStudyActivity,
   buildBackupPayload,
@@ -77,6 +90,8 @@ import {
   deleteNote as dbDeleteNote,
   getActivityHistory,
   getAllCards,
+  getMasterySnapshots,
+  putMasterySnapshot,
   getAllDecks,
   getAllLanguages,
   getAllNotes,
@@ -110,6 +125,25 @@ function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] 
   return [...incoming, ...existing.filter((e) => !incomingIds.has(e.id))];
 }
 
+// Minimal typing for the PWA install prompt event (not in lib.dom yet)
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+/** ISO-8601 week key (e.g. "2026-W47") for weekly mastery snapshots. */
+function isoWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = (d.getUTCDay() + 6) % 7; // Monday = 0
+  d.setUTCDate(d.getUTCDate() - dayNum + 3); // Thursday of this week
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const ftd = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - ftd + 3);
+  const week =
+    1 + Math.round((d.getTime() - firstThursday.getTime()) / (7 * 86400000));
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [languages, setLanguages] = useState<LanguageItem[]>([]);
@@ -134,6 +168,7 @@ export default function App() {
     undefined
   );
   const [addWordsTrigger, setAddWordsTrigger] = useState(0);
+  const [createDeckTrigger, setCreateDeckTrigger] = useState(0);
 
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [sfxMuted, setSfxMuted] = useState<boolean>(false);
@@ -159,6 +194,12 @@ export default function App() {
   const [quizSetupMode, setQuizSetupMode] = useState<SessionMode | undefined>(
     undefined
   );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [notesFocusId, setNotesFocusId] = useState<string | null>(null);
+  const [quizResumeState, setQuizResumeState] = useState<QuizResumeState | null>(null);
+  const [flashResumeState, setFlashResumeState] = useState<FlashcardResumeState | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [masterySnapshots, setMasterySnapshots] = useState<MasterySnapshot[]>([]);
   const toastTimeoutsRef = useRef<Set<number>>(new Set());
 
   // Initialize IndexedDB and load initial data
@@ -396,6 +437,24 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Starting any study session discards stale resume snapshots — the new
+  // session's own progress is what should be resumable from now on.
+  const beginSession = useCallback((config: SessionConfig) => {
+    clearAllResumeSessions();
+    setQuizResumeState(null);
+    setFlashResumeState(null);
+    setActiveSession(config);
+  }, []);
+
+  // Leaving a session deliberately (back button, language switch, new
+  // session) clears its resume snapshot so no stale prompt appears later.
+  const exitSession = useCallback(() => {
+    clearAllResumeSessions();
+    setQuizResumeState(null);
+    setFlashResumeState(null);
+    setActiveSession(null);
+  }, []);
+
   const toggleTheme = () => {
     // Header quick-toggle cycles light -> dark -> system -> light
     setTheme((prev) => (prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light'));
@@ -474,13 +533,13 @@ export default function App() {
       const firstDeckForLang = decks.find((d) => d.languageId === languageId);
       setActiveLanguageId(languageId);
       setSelectedDeckId(firstDeckForLang?.id ?? '');
-      setActiveSession(null);
+      exitSession();
       setQuizSetupOpen(false);
       setQuizSetupMode(undefined);
       setWorkspaceView('words');
       setStage('workspace');
     },
-    [decks]
+    [decks, exitSession]
   );
 
   const handleAddCustomLanguage = useCallback(
@@ -691,6 +750,7 @@ export default function App() {
         exampleSentence?: string;
         difficulty?: DifficultyLevel;
         mnemonic?: string;
+        tags?: string[];
       }
     ) => {
       const newCard: VocabCard = {
@@ -700,6 +760,7 @@ export default function App() {
         translation: data.translation,
         exampleSentence: data.exampleSentence,
         mnemonic: data.mnemonic?.trim() || undefined,
+        tags: data.tags && data.tags.length > 0 ? data.tags : undefined,
         confidence: 'new',
         difficulty: data.difficulty ?? 'medium',
         reviewCount: 0,
@@ -752,11 +813,18 @@ export default function App() {
         exampleSentence?: string;
         difficulty?: DifficultyLevel;
         mnemonic?: string;
+        tags?: string[];
       }
     ) => {
-      await updateCard(cardId, updates);
+      // An empty tag array means "clear all tags" — normalize to undefined
+      // so the stored card doesn't carry a meaningless empty list.
+      const normalized = { ...updates };
+      if (Array.isArray(normalized.tags) && normalized.tags.length === 0) {
+        normalized.tags = undefined;
+      }
+      await updateCard(cardId, normalized);
       setCards((prev) =>
-        prev.map((c) => (c.id === cardId ? { ...c, ...updates } : c))
+        prev.map((c) => (c.id === cardId ? { ...c, ...normalized } : c))
       );
     },
     []
@@ -857,6 +925,7 @@ export default function App() {
         confidence: ConfidenceLevel;
         difficulty?: DifficultyLevel;
         mnemonic?: string;
+        tags?: string[];
       }>;
     }) => {
       const now = new Date().toISOString();
@@ -877,6 +946,7 @@ export default function App() {
         confidence: item.confidence,
         difficulty: item.difficulty ?? 'medium',
         mnemonic: item.mnemonic?.trim() || undefined,
+        tags: item.tags && item.tags.length > 0 ? item.tags : undefined,
         reviewCount: 0,
         srsBox: 1,
         streak: 0,
@@ -899,10 +969,10 @@ export default function App() {
   }, []);
 
   const handleStartSession = useCallback((config: SessionConfig) => {
-    setActiveSession(config);
+    beginSession(config);
     setQuizSetupOpen(false);
     setQuizSetupMode(undefined);
-  }, []);
+  }, [beginSession]);
 
   // Notes CRUD — each sheet is its own persisted record
   const handlePersistNote = useCallback(
@@ -970,6 +1040,17 @@ export default function App() {
       const removed = notes.find((n) => n.id === noteId);
       await dbDeleteNote(noteId);
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      // Clear card → note links so no card points at a deleted sheet
+      const clearedCards = cards
+        .filter((c) => c.linkedNoteId === noteId)
+        .map((c) => ({ ...c, linkedNoteId: undefined }));
+      if (clearedCards.length > 0) {
+        const clearedIds = new Set(clearedCards.map((c) => c.id));
+        setCards((prev) =>
+          prev.map((c) => (clearedIds.has(c.id) ? { ...c, linkedNoteId: undefined } : c))
+        );
+        void putCards(clearedCards).catch(console.error);
+      }
       if (removed) {
         notify(`Deleted "${removed.title?.trim() || 'Untitled note'}"`, 'info', {
           label: 'Undo',
@@ -981,8 +1062,57 @@ export default function App() {
         });
       }
     },
+    [notes, cards, notify]
+  );
+
+  // Card → Blacknotes "grammar margin": reuse the linked note when present,
+  // otherwise create a prefilled sheet and link the card to it.
+  const handleSendCardToNote = useCallback(
+    async (card: VocabCard) => {
+      if (card.linkedNoteId) {
+        const linked = notes.find((n) => n.id === card.linkedNoteId);
+        if (linked) {
+          setWorkspaceView('notes');
+          setNotesFocusId(linked.id);
+          return;
+        }
+      }
+      const lines = [`${card.word} — ${card.translation}`];
+      if (card.exampleSentence) {
+        lines.push('', `Example: “${card.exampleSentence}”`);
+      }
+      if (card.mnemonic) {
+        lines.push('', `Memory tip: ${card.mnemonic}`);
+      }
+      const note: Note = {
+        id: createId('note'),
+        title: card.word,
+        content: lines.join('\n'),
+        updatedAt: new Date().toISOString(),
+      };
+      try {
+        await Promise.all([
+          putNote(note),
+          updateCard(card.id, { linkedNoteId: note.id }),
+        ]);
+        setNotes((prev) => [...prev, note]);
+        setCards((prev) =>
+          prev.map((c) => (c.id === card.id ? { ...c, linkedNoteId: note.id } : c))
+        );
+        setWorkspaceView('notes');
+        setNotesFocusId(note.id);
+        notify(`Sent "${card.word}" to Blacknotes`, 'success');
+      } catch {
+        notify('Could not create the note. Please try again.', 'error');
+      }
+    },
     [notes, notify]
   );
+
+  const handleOpenLinkedNote = useCallback((noteId: string) => {
+    setWorkspaceView('notes');
+    setNotesFocusId(noteId);
+  }, []);
 
   // Persist a completed session into history (state + IndexedDB)
   const recordSession = useCallback(
@@ -1032,7 +1162,7 @@ export default function App() {
       const target = new Set(cardIds);
       const pool = languageCards.filter((c) => target.has(c.id));
       if (pool.length === 0) return;
-      setActiveSession({
+      beginSession({
         mode: 'multiple-choice',
         deckIds: Array.from(new Set(pool.map((c) => c.deckId))),
         direction: 'word-to-translation',
@@ -1042,7 +1172,7 @@ export default function App() {
         smartCardIds: cardIds,
       });
     },
-    [languageCards]
+    [languageCards, beginSession]
   );
 
   const handleDailyGoalChange = useCallback((goal: number) => {
@@ -1072,7 +1202,7 @@ export default function App() {
       notify('No leech cards right now — nice work', 'info');
       return;
     }
-    setActiveSession({
+    beginSession({
       mode: 'flashcards',
       deckIds: Array.from(new Set(leeches.map((c) => c.deckId))),
       direction: 'word-to-translation',
@@ -1081,7 +1211,7 @@ export default function App() {
       leechFilter: 'only',
       leechLab: true,
     });
-  }, [languageCards, notify]);
+  }, [languageCards, notify, beginSession]);
 
   // One-click "Review Now" from the due-today banner
   const handleStartDueReview = useCallback(() => {
@@ -1090,7 +1220,7 @@ export default function App() {
       notify('Nothing due for review right now', 'info');
       return;
     }
-    setActiveSession({
+    beginSession({
       mode: 'multiple-choice',
       deckIds: Array.from(new Set(due.map((c) => c.deckId))),
       direction: 'word-to-translation',
@@ -1100,7 +1230,7 @@ export default function App() {
       smartReviewOnly: true,
       smartCardIds: due.map((c) => c.id),
     });
-  }, [languageCards, notify]);
+  }, [languageCards, notify, beginSession]);
 
   // Smart decks: saved dynamic filters over the language's cards
   const handleCreateSmartDeck = useCallback(
@@ -1273,6 +1403,12 @@ export default function App() {
             sessions: allSessions,
           })
         );
+        // Stamp the backup time only after a successful export so the
+        // stale-backup reminder reflects reality.
+        setAppPrefs((prev) => ({
+          ...prev,
+          lastBackupAt: new Date().toISOString(),
+        }));
         notify('Backup exported as JSON', 'success');
       } catch {
         notify('Could not export the backup. Please try again.', 'error');
@@ -1334,6 +1470,9 @@ export default function App() {
         if (payload.stats) {
           setStudyStats((prev) => ({ ...prev, ...payload.stats }));
         }
+        clearAllResumeSessions();
+        setQuizResumeState(null);
+        setFlashResumeState(null);
         setActiveSession(null);
         setQuizSetupOpen(false);
 
@@ -1413,6 +1552,217 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Offer to resume an interrupted quiz/flashcard session (sessionStorage
+  // snapshot). Snapshots whose decks/cards no longer exist are discarded.
+  const resumeCheckedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || resumeCheckedRef.current) return;
+    resumeCheckedRef.current = true;
+
+    const deckIds = new Set(decks.map((d) => d.id));
+    const cardIds = new Set(cards.map((c) => c.id));
+    const langDeckIds = new Set(languageDecks.map((d) => d.id));
+
+    const quiz = loadQuizResume();
+    let validQuiz: QuizResumeState | null = null;
+    if (quiz) {
+      const decksExist = quiz.config.deckIds.some((id) => deckIds.has(id));
+      const cardsExist = quiz.questions.some((q) => cardIds.has(q.card.id));
+      const inLanguage =
+        quiz.config.smartReviewOnly ||
+        quiz.config.deckIds.some((id) => langDeckIds.has(id));
+      if (decksExist && cardsExist && inLanguage) {
+        validQuiz = quiz;
+      } else {
+        clearQuizResume();
+      }
+    }
+
+    const flash = loadFlashcardResume();
+    let validFlash: FlashcardResumeState | null = null;
+    if (flash) {
+      const decksExist = flash.config.deckIds.some((id) => deckIds.has(id));
+      const cardsExist = flash.queueIds.some((id) => cardIds.has(id));
+      const inLanguage =
+        flash.config.smartReviewOnly ||
+        flash.config.deckIds.some((id) => langDeckIds.has(id));
+      if (decksExist && cardsExist && inLanguage) {
+        validFlash = flash;
+      } else {
+        clearFlashcardResume();
+      }
+    }
+
+    if (!validQuiz && !validFlash) return;
+
+    const kind = validQuiz ? 'quiz' : 'flashcards';
+    const count = validQuiz ? validQuiz.questions.length : validFlash!.queueIds.length;
+    notify(
+      `Interrupted ${kind === 'quiz' ? 'quiz' : 'flashcard'} session found (${count} ${count === 1 ? 'item' : 'items'})`,
+      'info',
+      {
+        label: 'Resume',
+        onAction: () => {
+          clearAllResumeSessions();
+          if (validQuiz) {
+            setActiveSession(validQuiz.config);
+            setQuizResumeState(validQuiz);
+          } else if (validFlash) {
+            setActiveSession(validFlash.config);
+            setFlashResumeState(validFlash);
+          }
+        },
+      }
+    );
+  }, [isLoading, decks, cards, languageDecks, notify]);
+
+  // Global shortcuts: Ctrl/Cmd+K palette, "g w/q/s/n" view chords, "c" new card.
+  // Suppressed while typing, in sessions, or when a modal/palette is open.
+  useEffect(() => {
+    let chordTimer: number | null = null;
+    let chord: string | null = null;
+    const VIEW_KEYS: Record<string, WorkspaceView> = {
+      w: 'words',
+      q: 'quiz',
+      s: 'stats',
+      n: 'notes',
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing =
+        !!t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT' ||
+          t.isContentEditable);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        if (stage === 'workspace') {
+          e.preventDefault();
+          setPaletteOpen((v) => !v);
+        }
+        return;
+      }
+
+      const uiOpen =
+        quizSetupOpen || settingsOpen || shortcutsOpen || paletteOpen;
+      if (
+        typing ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        stage !== 'workspace' ||
+        activeSession !== null ||
+        uiOpen
+      ) {
+        chord = null;
+        return;
+      }
+
+      if (chord === 'g') {
+        chord = null;
+        const view = VIEW_KEYS[e.key.toLowerCase()];
+        if (view) {
+          e.preventDefault();
+          setWorkspaceView(view);
+          setMobileNavOpen(false);
+        }
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'g' && !e.repeat) {
+        chord = 'g';
+        if (chordTimer !== null) window.clearTimeout(chordTimer);
+        chordTimer = window.setTimeout(() => {
+          chord = null;
+        }, 900);
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'c' && !e.repeat) {
+        e.preventDefault();
+        setWorkspaceView('words');
+        setAddWordsTrigger((n) => n + 1);
+        return;
+      }
+
+      chord = null;
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (chordTimer !== null) window.clearTimeout(chordTimer);
+    };
+  }, [
+    stage,
+    activeSession,
+    quizSetupOpen,
+    settingsOpen,
+    shortcutsOpen,
+    paletteOpen,
+  ]);
+
+  // PWA install prompt — Chrome/Edge fire beforeinstallprompt once eligible;
+  // we defer it and surface a one-click install in Settings.
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const handleInstallApp = useCallback(async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === 'accepted') setInstallPrompt(null);
+  }, [installPrompt]);
+
+  // Weekly mastery snapshot — written lazily the first time Statistics is
+  // viewed each ISO week, then read back for the trend chart.
+  useEffect(() => {
+    if (isLoading || stage !== 'workspace' || workspaceView !== 'stats') return;
+    const langId = activeLanguage.id;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const existing = await getMasterySnapshots(langId);
+        const key = isoWeekKey(new Date());
+        if (!existing.some((s) => s.weekKey === key)) {
+          const m = getDeckMastery(languageCards);
+          const snap: MasterySnapshot = {
+            id: `${langId}:${key}`,
+            languageId: langId,
+            weekKey: key,
+            capturedAt: new Date().toISOString(),
+            total: m.total,
+            mastered: m.mastered,
+            learning: m.learning,
+            fresh: m.fresh,
+            masteryPct: m.masteryPct,
+          };
+          await putMasterySnapshot(snap);
+          existing.push(snap);
+        }
+        if (!cancelled) setMasterySnapshots(existing);
+      } catch {
+        /* IndexedDB unavailable — trend simply stays empty */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, stage, workspaceView, activeLanguage.id, languageCards]);
+
   const deckNameFor = useCallback(
     (deckId: string) =>
       decks.find((d) => d.id === deckId)?.name ?? 'Vocabulary',
@@ -1434,7 +1784,7 @@ export default function App() {
     const quizMode: QuizMode =
       languageCards.length >= 2 ? 'multiple-choice' : 'typing';
 
-    setActiveSession({
+    beginSession({
       mode: quizMode,
       deckIds: targetDeckIds,
       direction: 'word-to-translation',
@@ -1447,16 +1797,50 @@ export default function App() {
     if (mode === 'weak') {
       notify(`Focusing on ${pool.length} weak ${pool.length === 1 ? 'word' : 'words'}`, 'info');
     }
-  }, [languageCards, notify]);
+  }, [languageCards, notify, beginSession]);
 
   const handleTopAddWords = () => {
-    setActiveSession(null);
+    exitSession();
     setAddWordsTrigger((n) => n + 1);
   };
 
   const handleConsumeAddWords = useCallback(() => {
     setAddWordsTrigger(0);
   }, []);
+
+  const handleConsumeCreateDeck = useCallback(() => {
+    setCreateDeckTrigger(0);
+  }, []);
+
+  // Command palette actions
+  const handlePaletteAction = useCallback(
+    (id: PaletteActionId) => {
+      switch (id) {
+        case 'new-deck':
+          setWorkspaceView('words');
+          setCreateDeckTrigger((n) => n + 1);
+          break;
+        case 'add-words':
+          setWorkspaceView('words');
+          setAddWordsTrigger((n) => n + 1);
+          break;
+        case 'smart-review':
+          handleStartSmartReview();
+          break;
+        case 'due-review':
+          handleStartDueReview();
+          break;
+        case 'new-note':
+          setWorkspaceView('notes');
+          void handleCreateNote();
+          break;
+        case 'export-backup':
+          handleExportAllBackup();
+          break;
+      }
+    },
+    [handleStartSmartReview, handleStartDueReview, handleCreateNote, handleExportAllBackup]
+  );
 
   // Loading state while IndexedDB initializes
   if (isLoading) {
@@ -1648,6 +2032,20 @@ export default function App() {
 
               <button
                 type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-label="Command palette"
+                title="Command palette (Ctrl+K)"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors text-xs font-medium"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Search</span>
+                <kbd className="hidden md:inline font-mono text-[10px] px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E] text-[#78716C] dark:text-[#A8A29E]">
+                  ⌘K
+                </kbd>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShortcutsOpen(true)}
                 aria-label="Keyboard shortcuts"
                 title="Keyboard shortcuts (?)"
@@ -1796,6 +2194,14 @@ export default function App() {
                   />
 
                   {workspaceView === 'words' && (
+                    <div className="space-y-6">
+                    <WordOfTheDay
+                      cards={languageCards}
+                      decks={languageDecks}
+                      langCode={activeLanguage.code}
+                      ttsMuted={ttsMuted}
+                      voice={activeVoice}
+                    />
                     <ErrorBoundary>
                       <DeckWorkspace
                       languageName={activeLanguage.name}
@@ -1825,8 +2231,14 @@ export default function App() {
                       onNotify={notify}
                       ttsMuted={ttsMuted}
                       voice={activeVoice}
+                      notes={notes}
+                      onSendCardToNote={handleSendCardToNote}
+                      onOpenLinkedNote={handleOpenLinkedNote}
+                      createDeckTrigger={createDeckTrigger}
+                      onConsumeCreateDeck={handleConsumeCreateDeck}
                     />
                     </ErrorBoundary>
+                    </div>
                   )}
 
                   {workspaceView === 'quiz' && (
@@ -1860,6 +2272,9 @@ export default function App() {
                         onPracticeMistakes={handlePracticeMistakes}
                         sessions={sessions}
                         onStartLeechLab={handleStartLeechLab}
+                        snapshots={masterySnapshots}
+                        lastBackupAt={appPrefs.lastBackupAt}
+                        onExportBackup={handleExportAllBackup}
                       />
                     </>
                   )}
@@ -1874,6 +2289,8 @@ export default function App() {
                       onTogglePin={handleTogglePinNote}
                       onDeleteNote={handleDeleteNote}
                       onPersist={handlePersistNote}
+                      focusNoteId={notesFocusId}
+                      onConsumeFocusNote={() => setNotesFocusId(null)}
                     />
                   )}
                     </div>
@@ -1892,7 +2309,7 @@ export default function App() {
                     sfxMuted={sfxMuted}
                     onRateCard={handleRateCard}
                     onOpenSetup={() => openQuizSetup(activeSession.deckIds[0])}
-                    onBackToWorkspace={() => setActiveSession(null)}
+                    onBackToWorkspace={exitSession}
                     ttsMuted={ttsMuted}
                     langCode={activeLanguage.code}
                     voice={activeVoice}
@@ -1900,6 +2317,7 @@ export default function App() {
                     autoSpeakAnswer={appPrefs.autoSpeakAnswer}
                     onSessionComplete={handleFlashcardSessionComplete}
                     onGraduateLeech={handleGraduateLeech}
+                    resumeState={flashResumeState}
                   />
                 </ErrorBoundary>
               )}
@@ -1917,12 +2335,13 @@ export default function App() {
                     onRecordAnswer={handleRecordQuizAnswer}
                     onQuizComplete={handleQuizComplete}
                     onOpenSetup={() => openQuizSetup(activeSession.deckIds[0])}
-                    onBackToWorkspace={() => setActiveSession(null)}
+                    onBackToWorkspace={exitSession}
                     ttsMuted={ttsMuted}
                     voice={activeVoice}
                     autoAdvance={appPrefs.autoAdvance}
                     autoSpeakPrompt={appPrefs.autoSpeakPrompt}
                     autoSpeakAnswer={appPrefs.autoSpeakAnswer}
+                    resumeState={quizResumeState}
                   />
                 </ErrorBoundary>
               )}
@@ -1994,9 +2413,35 @@ export default function App() {
         onNotesAutoSaveSecondsChange={(seconds) =>
           setAppPrefs((prev) => ({ ...prev, notesAutoSaveSeconds: seconds }))
         }
+        canInstallApp={installPrompt !== null}
+        onInstallApp={handleInstallApp}
+        lastBackupAt={appPrefs.lastBackupAt}
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        decks={languageDecks}
+        cards={languageCards}
+        notes={notes}
+        onOpenDeck={(deckId) => {
+          setSelectedDeckId(deckId);
+          setWorkspaceView('words');
+          setMobileNavOpen(false);
+        }}
+        onOpenCard={(card) => {
+          setSelectedDeckId(card.deckId);
+          setWorkspaceView('words');
+          setMobileNavOpen(false);
+        }}
+        onOpenNote={(noteId) => {
+          setWorkspaceView('notes');
+          setNotesFocusId(noteId);
+        }}
+        onAction={handlePaletteAction}
+      />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>

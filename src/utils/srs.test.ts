@@ -242,3 +242,47 @@ describe('getSmartReviewCards', () => {
     expect(allFuture.pool).toHaveLength(1);
   });
 });
+
+describe('getDailyForecast', () => {
+  it('buckets due cards into per-day counts starting today', async () => {
+    const { getDailyForecast } = await import('./srs');
+    const now = new Date('2026-11-17T12:00:00.000Z');
+    const base = { id: 'x', deckId: 'd', word: 'w', translation: 't', confidence: 'new' as const, reviewCount: 0, createdAt: '', srsBox: 1, streak: 0, lapses: 0 };
+    const at = (iso: string) => ({ ...base, nextReviewAt: iso });
+    // Build dates relative to local midnight of `now`
+    const mk = (dayOffset: number, hour = 12) => {
+      const d = new Date(now);
+      d.setHours(hour, 0, 0, 0);
+      d.setDate(d.getDate() + dayOffset);
+      return d.toISOString();
+    };
+    const cards = [
+      makeCard({ id: 'a', nextReviewAt: mk(0, 8) }),   // today
+      makeCard({ id: 'b', nextReviewAt: mk(1, 9) }),   // tomorrow
+      makeCard({ id: 'c', nextReviewAt: mk(3, 10) }),  // day+3
+      makeCard({ id: 'd' }),                            // never scheduled -> today
+      makeCard({ id: 'e', suspended: true, nextReviewAt: mk(0) }), // suspended -> skipped
+      makeCard({ id: 'f', nextReviewAt: mk(9) }),      // beyond window -> not counted
+    ];
+    const fc = getDailyForecast(cards, 7, now);
+    expect(fc[0]).toBe(2); // a + d
+    expect(fc[1]).toBe(1); // b
+    expect(fc[3]).toBe(1); // c
+    expect(fc[2]).toBe(0);
+    expect(fc[4]).toBe(0);
+    expect(fc.reduce((s, n) => s + n, 0)).toBe(4);
+    void at;
+  });
+});
+
+describe('matchesSmartFilter tag', () => {
+  it('matches cards by tag case-insensitively', async () => {
+    const { matchesSmartFilter } = await import('./srs');
+    const tagged = makeCard({ id: 't1', tags: ['Verbs', 'irregular'] });
+    const untagged = makeCard({ id: 't2', tags: ['nouns'] });
+    const filter = { tag: 'verbs' };
+    expect(matchesSmartFilter(tagged, filter, NOW_MS)).toBe(true);
+    expect(matchesSmartFilter(untagged, filter, NOW_MS)).toBe(false);
+    expect(matchesSmartFilter(tagged, { tag: 'missing' }, NOW_MS)).toBe(false);
+  });
+});

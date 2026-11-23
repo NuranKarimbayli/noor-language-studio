@@ -8,6 +8,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Printer,
   Save,
   Trash2,
 } from 'lucide-react';
@@ -128,6 +129,32 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
   const charCount = draft.length;
   const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0;
 
+  // Print-friendly export: opens a clean document window (title + content
+  // only, no app chrome) and triggers the browser print dialog. Prints the
+  // live draft so unsaved edits are included.
+  const handlePrint = () => {
+    const win = window.open('', '_blank', 'width=720,height=900');
+    if (!win) return;
+    const escapeHtml = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const title = escapeHtml(noteTitle(note));
+    const bodyHtml = draft.trim()
+      ? escapeHtml(draft).replace(/\n/g, '<br>')
+      : '<em>No content</em>';
+    const updated = new Date(note.updatedAt).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    win.document.write(
+      `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
+        `<style>body{font-family:Georgia,'Times New Roman',serif;max-width:640px;margin:48px auto;padding:0 24px;color:#1c1917;line-height:1.75}h1{font-size:24px;margin-bottom:4px}h1{font-weight:600}.meta{color:#78716c;font-size:12px;margin-bottom:28px}.content{font-size:15px;white-space:normal}@media print{body{margin:24px}}</style>` +
+        `</head><body><h1>${title}</h1><div class="meta">${updated}</div><div class="content">${bodyHtml}</div>` +
+        `<scr` + `ipt>window.addEventListener('load',()=>window.print())</scr` + `ipt></body></html>`
+    );
+    win.document.close();
+  };
+
   return (
     <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl overflow-hidden flex flex-col min-h-[26rem]">
       {/* Toolbar */}
@@ -142,6 +169,15 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
           <span className="hidden sm:inline text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
             {wordCount} {wordCount === 1 ? 'word' : 'words'} · {charCount} chars
           </span>
+          <button
+            type="button"
+            onClick={handlePrint}
+            aria-label={`Print ${noteTitle(note)}`}
+            title="Print / export as PDF"
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+          </button>
           <span
             className={`inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums ${statusInfo.className}`}
             role="status"
@@ -186,6 +222,8 @@ interface NotesPanelProps {
   onTogglePin: (noteId: string) => void;
   onDeleteNote: (noteId: string) => void;
   onPersist: (noteId: string, content: string) => Promise<void> | void;
+  focusNoteId?: string | null;
+  onConsumeFocusNote?: () => void;
 }
 
 export function NotesPanel({
@@ -197,6 +235,8 @@ export function NotesPanel({
   onTogglePin,
   onDeleteNote,
   onPersist,
+  focusNoteId = null,
+  onConsumeFocusNote,
 }: NotesPanelProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -228,6 +268,15 @@ export function NotesPanel({
     if (notes.length === 0) onCreateNote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // External "jump to this note" requests (card → note links, palette)
+  useEffect(() => {
+    if (!focusNoteId) return;
+    if (sortedNotes.some((n) => n.id === focusNoteId)) {
+      setActiveId(focusNoteId);
+    }
+    onConsumeFocusNote?.();
+  }, [focusNoteId, sortedNotes, onConsumeFocusNote]);
 
   const activeNote = sortedNotes.find((n) => n.id === activeId) ?? null;
 

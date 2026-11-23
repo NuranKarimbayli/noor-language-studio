@@ -9,6 +9,8 @@ import {
   FileUp,
   ListPlus,
   MoreHorizontal,
+  NotebookPen,
+  NotebookText,
   Pencil,
   Play,
   Plus,
@@ -18,8 +20,8 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { ConfidenceLevel, Deck, DifficultyLevel, SmartDeck, SmartDeckFilter, VocabCard } from '../types';
-import { exportDeckAsCsv, exportDeckAsJson, findDuplicateCard, getCardDifficulty, parseImportedDeckJson } from '../utils/storage';
+import { ConfidenceLevel, Deck, DifficultyLevel, Note, SmartDeck, SmartDeckFilter, VocabCard } from '../types';
+import { exportDeckAsCsv, exportDeckAsJson, findDuplicateCard, getCardDifficulty, parseCardTags, parseImportedDeckJson } from '../utils/storage';
 import { getDeckMastery, getSmartDeckCards, isCardDue, isLeechCard, matchesSmartFilter } from '../utils/srs';
 import { parseBulkLines } from '../utils/textUtils';
 import { DiacriticBar } from './DiacriticBar';
@@ -35,6 +37,8 @@ interface DeckWorkspaceProps {
   selectedDeckId: string;
   addWordsTrigger: number;
   onConsumeAddWords: () => void;
+  createDeckTrigger?: number;
+  onConsumeCreateDeck?: () => void;
   onSelectDeck: (deckId: string) => void;
   onCreateDeck: (data: { name: string; description: string }) => Promise<Deck>;
   onUpdateDeck: (
@@ -50,6 +54,7 @@ interface DeckWorkspaceProps {
       exampleSentence?: string;
       difficulty?: DifficultyLevel;
       mnemonic?: string;
+      tags?: string[];
     }
   ) => Promise<void>;
   onBulkAddCards: (
@@ -65,6 +70,7 @@ interface DeckWorkspaceProps {
       exampleSentence?: string;
       difficulty?: DifficultyLevel;
       mnemonic?: string;
+      tags?: string[];
     }
   ) => Promise<void>;
   onDeleteCard: (cardId: string) => Promise<void>;
@@ -83,6 +89,7 @@ interface DeckWorkspaceProps {
       exampleSentence?: string;
       confidence: ConfidenceLevel;
       difficulty?: DifficultyLevel;
+      tags?: string[];
     }>;
   }) => Promise<void>;
   onPracticeDeck: (deckId: string) => void;
@@ -97,6 +104,9 @@ interface DeckWorkspaceProps {
   onNotify: (text: string, variant?: 'success' | 'info' | 'error') => void;
   ttsMuted?: boolean;
   voice?: VoiceSelection | null;
+  notes?: Note[];
+  onSendCardToNote?: (card: VocabCard) => void;
+  onOpenLinkedNote?: (noteId: string) => void;
 }
 
 type ModalState =
@@ -128,6 +138,7 @@ const SMART_FILTER_OPTIONS: Array<{ key: keyof SmartDeckFilter; label: string; h
 
 function smartFilterSummary(filter: SmartDeckFilter): string {
   const parts = SMART_FILTER_OPTIONS.filter((o) => filter[o.key]).map((o) => o.label.toLowerCase());
+  if (filter.tag?.trim()) parts.push(`tag: ${filter.tag.trim()}`);
   return parts.length > 0 ? parts.join(' + ') : 'no filters';
 }
 
@@ -145,6 +156,8 @@ export function DeckWorkspace({
   selectedDeckId,
   addWordsTrigger,
   onConsumeAddWords,
+  createDeckTrigger = 0,
+  onConsumeCreateDeck,
   onSelectDeck,
   onCreateDeck,
   onUpdateDeck,
@@ -165,6 +178,9 @@ export function DeckWorkspace({
   onNotify,
   ttsMuted = false,
   voice,
+  notes = [],
+  onSendCardToNote,
+  onOpenLinkedNote,
 }: DeckWorkspaceProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -206,6 +222,8 @@ export function DeckWorkspace({
   const [cardTranslation, setCardTranslation] = useState('');
   const [cardExample, setCardExample] = useState('');
   const [cardMnemonic, setCardMnemonic] = useState('');
+  const [cardTagsInput, setCardTagsInput] = useState('');
+  const [tagFilter, setTagFilter] = useState('all');
   const [targetDeckNameForNew, setTargetDeckNameForNew] = useState('');
   const wordInputRef = useRef<HTMLInputElement>(null);
   const bulkTextRef = useRef<HTMLTextAreaElement>(null);
@@ -330,20 +348,40 @@ export function DeckWorkspace({
   // Deferred value keeps the list responsive while a large filter recomputes
   const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
 
+  // Unique tags across the current view, for the filter dropdown + datalist
+  const availableTags = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const c of viewCards) {
+      for (const t of c.tags ?? []) {
+        const key = t.toLowerCase();
+        if (!set.has(key)) set.set(key, t);
+      }
+    }
+    return [...set.values()].sort((a, b) => a.localeCompare(b));
+  }, [viewCards]);
+
   const filteredCards = useMemo(() => {
     const q = deferredSearchQuery.trim().toLowerCase();
+    const wantedTag = tagFilter === 'all' ? '' : tagFilter.toLowerCase();
     return viewCards.filter((card) => {
       if (confidenceFilter !== 'all' && card.confidence !== confidenceFilter) {
+        return false;
+      }
+      if (
+        wantedTag &&
+        !(card.tags ?? []).some((t) => t.toLowerCase() === wantedTag)
+      ) {
         return false;
       }
       if (!q) return true;
       return (
         card.word.toLowerCase().includes(q) ||
         card.translation.toLowerCase().includes(q) ||
+        (card.tags ?? []).some((t) => t.toLowerCase().includes(q)) ||
         (card.exampleSentence && card.exampleSentence.toLowerCase().includes(q))
       );
     });
-  }, [viewCards, deferredSearchQuery, confidenceFilter]);
+  }, [viewCards, deferredSearchQuery, confidenceFilter, tagFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredCards.length / ITEMS_PER_PAGE) || 1;
@@ -456,21 +494,34 @@ export function DeckWorkspace({
     };
   }, []);
 
-  // Trigger "+ Add Words" modal from top navigation CTA
+  // Trigger "+ Add Words" modal from top navigation CTA / command palette.
+  // If a modal is already open we just consume the trigger — never reset
+  // an in-progress form.
   useEffect(() => {
-    if (addWordsTrigger > 0) {
-      setCardWord('');
-      setCardTranslation('');
-      setCardExample('');
-      setCardMnemonic('');
-      setBulkText('');
-      setCardDifficulty('medium');
-      setBulkDifficulty('medium');
-      setTargetDeckNameForNew(`${languageName} Basics`);
-      setModal({ type: 'add-words', tab: 'single' });
-      onConsumeAddWords();
-    }
-  }, [addWordsTrigger, languageName, onConsumeAddWords]);
+    if (addWordsTrigger <= 0) return;
+    onConsumeAddWords();
+    if (modal.type !== 'none') return;
+    setCardWord('');
+    setCardTranslation('');
+    setCardExample('');
+    setCardMnemonic('');
+    setCardTagsInput('');
+    setBulkText('');
+    setCardDifficulty('medium');
+    setBulkDifficulty('medium');
+    setTargetDeckNameForNew(`${languageName} Basics`);
+    setModal({ type: 'add-words', tab: 'single' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addWordsTrigger]);
+
+  // Trigger "New Deck" modal from the command palette
+  useEffect(() => {
+    if (createDeckTrigger <= 0) return;
+    onConsumeCreateDeck?.();
+    if (modal.type !== 'none') return;
+    openCreateDeck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createDeckTrigger]);
 
   const openCreateDeck = () => {
     setDeckName('');
@@ -489,6 +540,7 @@ export function DeckWorkspace({
     setCardTranslation('');
     setCardExample('');
     setCardMnemonic('');
+    setCardTagsInput('');
     setBulkText('');
     setCardDifficulty('medium');
     setBulkDifficulty('medium');
@@ -501,6 +553,7 @@ export function DeckWorkspace({
     setCardTranslation(card.translation);
     setCardExample(card.exampleSentence ?? '');
     setCardMnemonic(card.mnemonic ?? '');
+    setCardTagsInput((card.tags ?? []).join(', '));
     setCardDifficulty(getCardDifficulty(card));
     setModal({ type: 'edit-card', card });
   };
@@ -553,6 +606,7 @@ export function DeckWorkspace({
     const translation = cardTranslation.trim();
     const exampleSentence = cardExample.trim() || undefined;
     const mnemonic = cardMnemonic.trim() || undefined;
+    const tags = parseCardTags(cardTagsInput);
     if (!word || !translation) return;
 
     try {
@@ -563,6 +617,7 @@ export function DeckWorkspace({
           exampleSentence,
           difficulty: cardDifficulty,
           mnemonic,
+          tags,
         });
         onNotify(`Updated "${word}"`, 'success');
       } else {
@@ -573,6 +628,7 @@ export function DeckWorkspace({
           exampleSentence,
           difficulty: cardDifficulty,
           mnemonic,
+          tags,
         });
         onNotify(`Added "${word}"`, 'success');
       }
@@ -673,7 +729,9 @@ export function DeckWorkspace({
     e.preventDefault();
     const name = smartDeckName.trim();
     if (!name) return;
-    const hasFilter = SMART_FILTER_OPTIONS.some((o) => smartDeckFilter[o.key]);
+    const hasFilter =
+      SMART_FILTER_OPTIONS.some((o) => smartDeckFilter[o.key]) ||
+      Boolean(smartDeckFilter.tag?.trim());
     if (!hasFilter) {
       onNotify('Pick at least one filter for the smart deck.', 'error');
       return;
@@ -682,7 +740,10 @@ export function DeckWorkspace({
       await onCreateSmartDeck({
         name,
         description: smartDeckDesc.trim() || undefined,
-        filter: smartDeckFilter,
+        filter: {
+          ...smartDeckFilter,
+          tag: smartDeckFilter.tag?.trim() || undefined,
+        },
       });
       setModal({ type: 'none' });
     } catch {
@@ -1305,6 +1366,21 @@ export function DeckWorkspace({
                   );
                 })}
                 </div>
+                {availableTags.length > 0 && (
+                  <select
+                    value={tagFilter}
+                    onChange={(e) => setTagFilter(e.target.value)}
+                    aria-label="Filter words by tag"
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309] max-w-[140px] truncate"
+                  >
+                    <option value="all">All tags</option>
+                    {availableTags.map((t) => (
+                      <option key={t.toLowerCase()} value={t}>
+                        #{t}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           )}
@@ -1411,6 +1487,7 @@ export function DeckWorkspace({
                   onClick={() => {
                     setSearchQuery('');
                     setConfidenceFilter('all');
+                    setTagFilter('all');
                   }}
                   className="text-sm font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
                 >
@@ -1464,6 +1541,14 @@ export function DeckWorkspace({
                           <span className="text-sm sm:text-base text-[#57534E] dark:text-[#C4BEB4] select-text">
                             {card.translation}
                           </span>
+                          {(card.tags ?? []).map((t) => (
+                            <span
+                              key={t}
+                              className="px-1.5 py-0.5 rounded-md bg-[#F3EFE8] dark:bg-[#25221E] text-[#78716C] dark:text-[#A8A29E] text-[11px] font-medium"
+                            >
+                              #{t}
+                            </span>
+                          ))}
                         </div>
                         {card.exampleSentence && (
                           <p className="text-xs sm:text-sm italic text-[#78716C] dark:text-[#A8A29E]">
@@ -1473,6 +1558,19 @@ export function DeckWorkspace({
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                        {card.linkedNoteId &&
+                          notes.some((n) => n.id === card.linkedNoteId) &&
+                          onOpenLinkedNote && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenLinkedNote(card.linkedNoteId!)}
+                              aria-label={`Open linked note for ${card.word}`}
+                              title="Open linked notebook note"
+                              className="p-1.5 rounded-lg text-[#B45309] dark:text-[#F59E0B] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
+                            >
+                              <NotebookText className="w-4 h-4" />
+                            </button>
+                          )}
                         {isLeechCard(card) && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-semibold"
@@ -1526,6 +1624,19 @@ export function DeckWorkspace({
                                 <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
                                 Edit
                               </button>
+                              {onSendCardToNote && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardMenuId(null);
+                                    onSendCardToNote(card);
+                                  }}
+                                  className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
+                                >
+                                  <NotebookPen className="w-3.5 h-3.5 text-[#78716C]" />
+                                  {card.linkedNoteId ? 'Open note' : 'Send to notebook'}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -1857,7 +1968,29 @@ export function DeckWorkspace({
                       />
                     </div>
 
-                    {renderDifficultyPicker(cardDifficulty, setCardDifficulty)}
+                    <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Tags (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={cardTagsInput}
+                    onChange={(e) => setCardTagsInput(e.target.value)}
+                    placeholder="e.g., verbs, food, travel"
+                    list="card-tags-suggestions"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                  <datalist id="card-tags-suggestions">
+                    {availableTags.map((t) => (
+                      <option key={t.toLowerCase()} value={t} />
+                    ))}
+                  </datalist>
+                  <p className="mt-1 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                    Comma-separated — used for filtering and smart decks.
+                  </p>
+                </div>
+
+                {renderDifficultyPicker(cardDifficulty, setCardDifficulty)}
 
                     <div className="flex items-center justify-end gap-2.5 pt-2">
                       <button
@@ -2031,6 +2164,28 @@ export function DeckWorkspace({
                     placeholder="e.g., Sounds like 'labas' — imagine a lab assistant"
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Tags (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={cardTagsInput}
+                    onChange={(e) => setCardTagsInput(e.target.value)}
+                    placeholder="e.g., verbs, food, travel"
+                    list="card-tags-suggestions"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                  <datalist id="card-tags-suggestions">
+                    {availableTags.map((t) => (
+                      <option key={t.toLowerCase()} value={t} />
+                    ))}
+                  </datalist>
+                  <p className="mt-1 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                    Comma-separated — used for filtering and smart decks.
+                  </p>
                 </div>
 
                 {renderDifficultyPicker(cardDifficulty, setCardDifficulty)}
@@ -2219,6 +2374,30 @@ export function DeckWorkspace({
                     </strong>{' '}
                     {smartPreviewCount === 1 ? 'word' : 'words'}
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
+                    Tag filter (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={smartDeckFilter.tag ?? ''}
+                    onChange={(e) =>
+                      setSmartDeckFilter((prev) => ({
+                        ...prev,
+                        tag: e.target.value || undefined,
+                      }))
+                    }
+                    placeholder="e.g., verbs — matches cards with this tag"
+                    list="smart-deck-tag-suggestions"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
+                  />
+                  <datalist id="smart-deck-tag-suggestions">
+                    {availableTags.map((t) => (
+                      <option key={t.toLowerCase()} value={t} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="flex items-center justify-end gap-2.5 pt-2">

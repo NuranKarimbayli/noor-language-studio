@@ -13,6 +13,7 @@ import {
 import {
   ConfidenceLevel,
   Deck,
+  FlashcardResumeState,
   SessionCompletionSummary,
   SessionConfig,
   VocabCard,
@@ -26,6 +27,7 @@ import {
 } from '../utils/soundEffects';
 import { CelebrationBurst } from './CelebrationBurst';
 import { SpeakButton } from './SpeakButton';
+import { saveFlashcardResume } from '../utils/sessionResume';
 import {
   isVoiceSupported,
   speakText,
@@ -52,6 +54,7 @@ interface FlashcardStudyProps {
   autoSpeakAnswer?: boolean;
   onSessionComplete?: (summary: SessionCompletionSummary) => void;
   onGraduateLeech?: (card: VocabCard) => void;
+  resumeState?: FlashcardResumeState | null;
 }
 
 type QueueOrder = 'smart' | 'sequential' | 'shuffled';
@@ -86,23 +89,39 @@ export function FlashcardStudy({
   autoSpeakAnswer = false,
   onSessionComplete,
   onGraduateLeech,
+  resumeState = null,
 }: FlashcardStudyProps) {
-  const [queueOrder, setQueueOrder] = useState<QueueOrder>('smart');
+  const [queueOrder, setQueueOrder] = useState<QueueOrder>(
+    resumeState?.queueOrder ?? 'smart'
+  );
   const [onlyHardMode, setOnlyHardMode] = useState(false);
 
   const [sessionSeed, setSessionSeed] = useState(1);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [sessionComplete, setSessionComplete] = useState(false);
-  const [sessionRatings, setSessionRatings] = useState({ hard: 0, good: 0, easy: 0 });
+  const [currentIndex, setCurrentIndex] = useState(resumeState?.currentIndex ?? 0);
+  const [isFlipped, setIsFlipped] = useState(resumeState?.isFlipped ?? false);
+  const [sessionComplete, setSessionComplete] = useState(
+    resumeState?.sessionComplete ?? false
+  );
+  const [sessionRatings, setSessionRatings] = useState(
+    resumeState?.sessionRatings ?? { hard: 0, good: 0, easy: 0 }
+  );
+  // Cards rated Hard are re-inserted once near the end of the same session
+  const [requeueIds, setRequeueIds] = useState<string[]>([]);
   const [ratingPulse, setRatingPulse] = useState<'good' | 'hard' | null>(null);
 
   const advanceLockRef = useRef(false);
   const rateTimeoutRef = useRef<number | null>(null);
   const sessionStartRef = useRef<number>(performance.now());
-  const completionReportedRef = useRef(false);
+  // A resumed session that already completed must not re-report history
+  const completionReportedRef = useRef<boolean>(
+    resumeState?.sessionComplete ?? false
+  );
   // Leech Lab: consecutive non-hard ratings per card id
   const leechStreakRef = useRef<Map<string, number>>(new Map());
+  // Skip the config-reset effect once when mounting from a resume snapshot
+  const didResumeRef = useRef<boolean>(resumeState !== null);
+  const resumeOrderRef = useRef<string[] | null>(resumeState?.queueIds ?? null);
+  const resumeOrderAppliedRef = useRef(false);
 
   const deckMap = useMemo(() => {
     const map = new Map<string, Deck>();
@@ -112,6 +131,10 @@ export function FlashcardStudy({
 
   // Reset session when config changes
   useEffect(() => {
+    if (didResumeRef.current) {
+      didResumeRef.current = false;
+      return;
+    }
     // A pending post-rating advance must not fire into the new session —
     // it would skip a card or instantly complete the fresh queue.
     if (rateTimeoutRef.current !== null) {
@@ -120,6 +143,7 @@ export function FlashcardStudy({
     }
     advanceLockRef.current = false;
     setOnlyHardMode(false);
+    setRequeueIds([]);
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionComplete(false);
@@ -163,19 +187,51 @@ export function FlashcardStudy({
       pool = pool.slice(0, sessionConfig.questionCount);
     }
 
-    return pool.map((card) => {
-      const deck = deckMap.get(card.deckId);
-      // Strict anchoring: the prompt is always the target-language word
-      const promptSide: 'word' | 'translation' = 'word';
+    // Direction: 'translation-to-word' prompts with the native meaning
+    // (production recall); 'random' alternates per queue position.
+    const direction = sessionConfig.direction ?? 'word-to-translation';
+    const promptSideFor = (position: number): 'word' | 'translation' =>
+      direction === 'translation-to-word'
+        ? 'translation'
+        : direction === 'random'
+          ? position % 2 === 0
+            ? 'word'
+            : 'translation'
+          : 'word';
 
-      return {
+    const items: StudyItem[] = pool.map((card, index) => ({
+      card,
+      deckName: deckMap.get(card.deckId)?.name ?? 'Vocabulary Deck',
+      promptSide: promptSideFor(index),
+    }));
+
+    // Resume: reorder the rebuilt queue to the persisted card order once.
+    // Cards missing from the snapshot (deleted since) sink to the end.
+    if (!resumeOrderAppliedRef.current && resumeOrderRef.current) {
+      resumeOrderAppliedRef.current = true;
+      const order = new Map(resumeOrderRef.current.map((id, i) => [id, i]));
+      items.sort(
+        (a, b) =>
+          (order.get(a.card.id) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.card.id) ?? Number.MAX_SAFE_INTEGER)
+      );
+    }
+
+    // In-session relearning: each card is re-inserted at most once.
+    for (const id of requeueIds) {
+      if (items.some((i) => i.card.id === id)) continue;
+      const card = cards.find((c) => c.id === id);
+      if (!card || card.suspended) continue;
+      items.push({
         card,
-        deckName: deck?.name ?? 'Vocabulary Deck',
-        promptSide,
-      };
-    });
+        deckName: deckMap.get(card.deckId)?.name ?? 'Vocabulary Deck',
+        promptSide: promptSideFor(items.length),
+      });
+    }
+
+    return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionConfig, queueOrder, onlyHardMode, sessionSeed]);
+  }, [sessionConfig, queueOrder, onlyHardMode, sessionSeed, requeueIds]);
 
   const currentItem = studyQueue[currentIndex] ?? null;
   const liveCard = currentItem
@@ -193,6 +249,7 @@ export function FlashcardStudy({
   const restartSession = useCallback((hardOnly = false) => {
     cancelPendingAdvance();
     setOnlyHardMode(hardOnly);
+    setRequeueIds([]);
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionComplete(false);
@@ -207,6 +264,7 @@ export function FlashcardStudy({
   const handleOrderChange = (nextOrder: QueueOrder) => {
     cancelPendingAdvance();
     setQueueOrder(nextOrder);
+    setRequeueIds([]);
     setCurrentIndex(0);
     setIsFlipped(false);
     setSessionComplete(false);
@@ -246,6 +304,14 @@ export function FlashcardStudy({
 
       const ratedCard = onRateCard(currentItem.card.id, level);
       setSessionRatings((prev) => ({ ...prev, [level]: prev[level] + 1 }));
+
+      // In-session relearning: a Hard rating re-queues the card once, near
+      // the end of this session for a second retrieval attempt.
+      if (level === 'hard') {
+        setRequeueIds((prev) =>
+          prev.includes(currentItem.card.id) ? prev : [...prev, currentItem.card.id]
+        );
+      }
 
       // Leech Lab: two consecutive non-hard ratings graduate the card. The
       // card returned by onRateCard already carries the fresh SRS outcome.
@@ -385,6 +451,29 @@ export function FlashcardStudy({
     currentItem,
     langCode,
     voice,
+  ]);
+
+  // Persist session progress for resume-after-interrupt (refresh/crash).
+  // Cleared by the app on deliberate exit or when a new session starts.
+  useEffect(() => {
+    if (studyQueue.length === 0) return;
+    saveFlashcardResume({
+      config: sessionConfig,
+      queueIds: studyQueue.map((i) => i.card.id),
+      queueOrder,
+      currentIndex: Math.min(currentIndex, studyQueue.length - 1),
+      isFlipped,
+      sessionComplete,
+      sessionRatings,
+    });
+  }, [
+    studyQueue,
+    sessionConfig,
+    queueOrder,
+    currentIndex,
+    isFlipped,
+    sessionComplete,
+    sessionRatings,
   ]);
 
   // Report session completion exactly once per finished session

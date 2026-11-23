@@ -18,6 +18,7 @@ import {
   DifficultyLevel,
   SessionConfig,
   SessionMode,
+  StudyDirection,
   VocabCard,
 } from '../types';
 import { Modal } from './Modal';
@@ -114,6 +115,7 @@ export function QuizSetupModal({
   onStartSession,
 }: QuizSetupModalProps) {
   const [mode, setMode] = useState<SessionMode>(initialMode);
+  const [direction, setDirection] = useState<StudyDirection>('word-to-translation');
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
@@ -145,6 +147,7 @@ export function QuizSetupModal({
   useEffect(() => {
     if (!open) return;
     setMode(initialMode);
+    setDirection('word-to-translation');
     if (initialDeckId && decks.some((d) => d.id === initialDeckId)) {
       setSelectedDeckIds([initialDeckId]);
     } else if (decks.length > 0) {
@@ -276,8 +279,7 @@ export function QuizSetupModal({
     onStartSession({
       mode,
       deckIds: selectedDeckIds,
-      // Strict anchoring: always prompt with the target word, answer with the translation
-      direction: 'word-to-translation',
+      direction,
       questionCount: effectiveCount,
       timerSeconds: mode === 'flashcards' ? 0 : timerSeconds,
       difficultyFilter: difficulties.length > 0 ? difficulties : undefined,
@@ -456,6 +458,40 @@ export function QuizSetupModal({
               })}
             </div>
           )}
+        </div>
+
+        {/* Direction: recognition (word → meaning) vs production recall
+            (meaning → word). Mixed alternates per question for balanced practice. */}
+        <div className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
+            Direction
+          </span>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(
+              [
+                { id: 'word-to-translation', label: 'Word → Meaning' },
+                { id: 'translation-to-word', label: 'Meaning → Word' },
+                { id: 'random', label: 'Mixed' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setDirection(opt.id)}
+                className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
+                  direction === opt.id
+                    ? 'border-[#B45309] dark:border-[#D97706] bg-[#B45309] text-white'
+                    : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
+            Meaning → Word tests production recall — the harder, higher-value
+            direction. Mixed alternates both.
+          </p>
         </div>
 
         {/* 3. Difficulty Filter */}

@@ -243,3 +243,14 @@ describe('parseBackupJson', () => {
     );
   });
 });
+
+describe('parseCardTags', () => {
+  it('normalizes, dedupes, and caps tags', async () => {
+    const { parseCardTags } = await import('./storage');
+    expect(parseCardTags('  Verbs , verbs,irregular , ,travel  ')).toEqual(['Verbs', 'irregular', 'travel']);
+    expect(parseCardTags('')).toEqual([]);
+    const many = Array.from({ length: 20 }, (_, i) => `t${i}`).join(',');
+    expect(parseCardTags(many)).toHaveLength(12);
+    expect(parseCardTags('x'.repeat(40))).toEqual(['x'.repeat(24)]);
+  });
+});

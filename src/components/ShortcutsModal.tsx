@@ -96,6 +96,12 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
           </Section>
 
           <Section title="Global">
+            <ShortcutRow keys={['Ctrl', 'K']} label="Command palette (Cmd on Mac)" />
+            <ShortcutRow keys={['G', 'W']} label="Go to Words" />
+            <ShortcutRow keys={['G', 'Q']} label="Go to Quiz" />
+            <ShortcutRow keys={['G', 'S']} label="Go to Statistics" />
+            <ShortcutRow keys={['G', 'N']} label="Go to Notes" />
+            <ShortcutRow keys={['C']} label="New word" />
             <ShortcutRow keys={['?']} label="Toggle this cheat-sheet" />
           </Section>
         </div>

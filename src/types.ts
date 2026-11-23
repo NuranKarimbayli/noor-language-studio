@@ -61,6 +61,10 @@ export interface VocabCard {
   // Archived cards stay in the deck but are hidden from study sessions and
   // (by default) the word list until restored.
   suspended?: boolean;
+  // Freeform labels (e.g. "verbs", "food") for filtering and smart decks
+  tags?: string[];
+  // Optional link to a Blacknotes sheet ("grammar margin" for this word)
+  linkedNoteId?: string;
 }
 
 export interface Deck {
@@ -140,6 +144,7 @@ export interface AppPrefs {
   onboardingDismissed?: boolean; // first-run checklist hidden
   notesAutoSave?: boolean; // auto-save the notepad while typing (default true)
   notesAutoSaveSeconds?: number; // debounce interval for auto-save (1|2|5|10)
+  lastBackupAt?: string; // ISO timestamp of the last full-backup export
 }
 
 // Freeform study notes ("note sheets"), persisted in IndexedDB and included
@@ -193,6 +198,7 @@ export interface SmartDeckFilter {
   leeches?: boolean; // isLeechCard
   newOnly?: boolean; // confidence === 'new'
   hardOnly?: boolean; // confidence === 'hard'
+  tag?: string; // cards carrying this tag (case-insensitive)
 }
 
 export interface SmartDeck {
@@ -202,6 +208,45 @@ export interface SmartDeck {
   description?: string;
   createdAt: string;
   filter: SmartDeckFilter;
+}
+
+// Point-in-time mastery snapshot per language, persisted weekly so the
+// Statistics view can draw a real retention/progress trendline.
+export interface MasterySnapshot {
+  id: string; // `${languageId}:${weekKey}`
+  languageId: string;
+  weekKey: string; // ISO week-ish key, e.g. "2026-W47"
+  capturedAt: string; // ISO timestamp
+  total: number;
+  mastered: number;
+  learning: number;
+  fresh: number;
+  masteryPct: number;
+}
+
+// Serializable snapshot of an in-progress quiz session (sessionStorage).
+// Questions embed their card objects so a resume never depends on live
+// IndexedDB state; App validates card existence before offering resume.
+export interface QuizResumeState {
+  config: SessionConfig & { mode: QuizMode };
+  questions: QuizQuestion[];
+  currentIdx: number;
+  records: QuizAnswerRecord[];
+  phase: 'running' | 'results';
+  typedAnswer?: string;
+}
+
+// Serializable snapshot of an in-progress flashcard session. The study
+// queue is persisted as an ordered list of card ids so the rebuilt queue
+// can be re-ordered to match exactly.
+export interface FlashcardResumeState {
+  config: SessionConfig;
+  queueIds: string[];
+  queueOrder: 'smart' | 'sequential' | 'shuffled';
+  currentIndex: number;
+  isFlipped: boolean;
+  sessionComplete: boolean;
+  sessionRatings: { hard: number; good: number; easy: number };
 }
 
 export interface ToastMessage {

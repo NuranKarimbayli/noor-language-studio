@@ -19,6 +19,7 @@ import {
   QuizAnswerRecord,
   QuizMode,
   QuizQuestion,
+  QuizResumeState,
   QuizSessionSummary,
   SessionConfig,
   VocabCard,
@@ -44,6 +45,7 @@ import {
 import { CelebrationBurst } from './CelebrationBurst';
 import { DiacriticBar } from './DiacriticBar';
 import { SpeakButton } from './SpeakButton';
+import { saveQuizResume } from '../utils/sessionResume';
 
 interface QuizCenterProps {
   languageCode: string;
@@ -60,6 +62,7 @@ interface QuizCenterProps {
   autoAdvance?: boolean;
   autoSpeakPrompt?: boolean;
   autoSpeakAnswer?: boolean;
+  resumeState?: QuizResumeState | null;
 }
 
 type QuizPhase = 'running' | 'results';
@@ -127,13 +130,18 @@ export function QuizCenter({
   autoAdvance = false,
   autoSpeakPrompt = false,
   autoSpeakAnswer = false,
+  resumeState = null,
 }: QuizCenterProps) {
-  const [phase, setPhase] = useState<QuizPhase>('running');
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [records, setRecords] = useState<QuizAnswerRecord[]>([]);
+  const [phase, setPhase] = useState<QuizPhase>(resumeState?.phase ?? 'running');
+  const [questions, setQuestions] = useState<QuizQuestion[]>(
+    resumeState?.questions ?? []
+  );
+  const [currentIdx, setCurrentIdx] = useState(resumeState?.currentIdx ?? 0);
+  const [records, setRecords] = useState<QuizAnswerRecord[]>(
+    resumeState?.records ?? []
+  );
   const [currentRecord, setCurrentRecord] = useState<QuizAnswerRecord | null>(null);
-  const [typedAnswer, setTypedAnswer] = useState('');
+  const [typedAnswer, setTypedAnswer] = useState(resumeState?.typedAnswer ?? '');
   const [hintRevealed, setHintRevealed] = useState(false);
 
   // Speaking-practice state (Web Speech recognition)
@@ -161,6 +169,13 @@ export function QuizCenter({
   const sessionStartRef = useRef<number>(performance.now());
   const recordsRef = useRef<QuizAnswerRecord[]>([]);
   recordsRef.current = records;
+  const currentIdxRef = useRef(currentIdx);
+  currentIdxRef.current = currentIdx;
+  // In-session relearning: each missed card is re-queued at most once
+  const relearnedCardIdsRef = useRef<Set<string>>(new Set());
+  const relearnSeqRef = useRef(0);
+  // Skip the pool-build effect once when mounting from a resume snapshot
+  const didResumeRef = useRef<boolean>(resumeState !== null);
 
   // Cooldown timer internals: wall-clock deadline + direct DOM writes
   const cooldownBarRef = useRef<HTMLDivElement>(null);
@@ -217,6 +232,11 @@ export function QuizCenter({
         ? null
         : shuffleList([...sourceCards, ...nonSourceCards]);
 
+      // Session direction: 'random' alternates word→meaning and
+      // meaning→word per question so both recognition and production
+      // recall get practiced in one session.
+      const sessionDirection = config.direction ?? 'word-to-translation';
+
       return pool.map((card, index) => {
         const deck = deckMap.get(card.deckId);
         const deckName = deck?.name ?? 'Deck';
@@ -251,13 +271,21 @@ export function QuizCenter({
           };
         }
 
-        // Strict anchoring: the prompt is always the target-language word and
-        // every answer/option is drawn from the native translation field.
+        // word→translation tests recognition; translation→word tests
+        // production recall. 'random' alternates per question index.
         const resolvedDirection: 'word-to-translation' | 'translation-to-word' =
-          'word-to-translation';
+          sessionDirection === 'random'
+            ? index % 2 === 0
+              ? 'word-to-translation'
+              : 'translation-to-word'
+            : sessionDirection === 'translation-to-word'
+              ? 'translation-to-word'
+              : 'word-to-translation';
 
-        const promptText = card.word;
-        const expectedAnswer = card.translation;
+        const promptText =
+          resolvedDirection === 'word-to-translation' ? card.word : card.translation;
+        const expectedAnswer =
+          resolvedDirection === 'word-to-translation' ? card.translation : card.word;
 
         // Distractor isolation: when enabled (default), candidates are ordered
         // so the question card's own deck is exhausted first, then other
@@ -379,6 +407,12 @@ export function QuizCenter({
 
   // Initialize quiz whenever sessionConfig changes
   useEffect(() => {
+    if (didResumeRef.current) {
+      didResumeRef.current = false;
+      return;
+    }
+    relearnedCardIdsRef.current = new Set();
+    relearnSeqRef.current = 0;
     let selectedPool = cards.filter(
       (c) => sessionConfig.deckIds.includes(c.deckId) && !c.suspended
     );
@@ -406,6 +440,50 @@ export function QuizCenter({
     startWithPool(eligible, Math.min(sessionConfig.questionCount, eligible.length));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionConfig]);
+
+  // Persist in-progress session for resume-after-interrupt (refresh, PWA
+  // reload). The app clears the snapshot on deliberate exit or a new session.
+  useEffect(() => {
+    if (questions.length === 0) return;
+    saveQuizResume({
+      config: sessionConfig,
+      questions,
+      currentIdx: Math.min(currentIdx, questions.length - 1),
+      records,
+      phase,
+      typedAnswer,
+    });
+  }, [questions, currentIdx, records, phase, typedAnswer]);
+
+  // In-session relearning: an incorrect answer re-queues a fresh question
+  // for the same card a few items ahead (or at the end near session end).
+  // Each card is retried at most once per session, keeping the loop bounded.
+  const enqueueRelearnQuestion = useCallback(
+    (cardId: string) => {
+      if (relearnedCardIdsRef.current.has(cardId)) return;
+      const fresh = cards.find((c) => c.id === cardId);
+      if (!fresh || fresh.suspended) return;
+      if (getEligiblePool([fresh], sessionConfig.mode).length === 0) return;
+      const built = buildQuestions([fresh], {
+        ...sessionConfig,
+        questionCount: 1,
+      });
+      const base = built[0];
+      if (!base) return;
+      relearnedCardIdsRef.current.add(cardId);
+      const retry: QuizQuestion = {
+        ...base,
+        id: `${base.id}-retry${relearnSeqRef.current++}`,
+      };
+      setQuestions((prev) => {
+        const insertAt = Math.min(prev.length, currentIdxRef.current + 4);
+        const next = [...prev];
+        next.splice(insertAt, 0, retry);
+        return next;
+      });
+    },
+    [cards, sessionConfig, buildQuestions]
+  );
 
   const currentQuestion = questions[currentIdx] ?? null;
 
@@ -560,12 +638,13 @@ export function QuizCenter({
       setCurrentRecord(record);
       setRecords((prev) => [...prev, record]);
       onRecordAnswer(currentQuestion.card.id, isCorrect, isCorrect);
+      if (!isCorrect) enqueueRelearnQuestion(currentQuestion.card.id);
       triggerFeedback(isCorrect);
       setTimeout(() => {
         submissionLockRef.current = false;
       }, 300);
     },
-    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback]
+    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]
   );
 
   const handleMultipleChoiceSelect = useCallback(
@@ -582,12 +661,13 @@ export function QuizCenter({
       setCurrentRecord(record);
       setRecords((prev) => [...prev, record]);
       onRecordAnswer(currentQuestion.card.id, isCorrect, isCorrect);
+      if (!isCorrect) enqueueRelearnQuestion(currentQuestion.card.id);
       triggerFeedback(isCorrect);
       setTimeout(() => {
         submissionLockRef.current = false;
       }, 300);
     },
-    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback]
+    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]
   );
 
   const handleTypedSubmit = useCallback(
@@ -622,11 +702,12 @@ export function QuizCenter({
         evaluation.status === 'exact'
       );
       triggerFeedback(evaluation.isCorrect);
+      if (!evaluation.isCorrect) enqueueRelearnQuestion(currentQuestion.card.id);
       setTimeout(() => {
         submissionLockRef.current = false;
       }, 300);
     },
-    [currentQuestion, currentRecord, typedAnswer, sessionConfig.mode, onRecordAnswer, triggerFeedback]
+    [currentQuestion, currentRecord, typedAnswer, sessionConfig.mode, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]
   );
 
   // Score a recognized transcript exactly like a typed answer.
@@ -652,11 +733,12 @@ export function QuizCenter({
         evaluation.status === 'exact'
       );
       triggerFeedback(evaluation.isCorrect);
+      if (!evaluation.isCorrect) enqueueRelearnQuestion(currentQuestion.card.id);
       setTimeout(() => {
         submissionLockRef.current = false;
       }, 300);
     },
-    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback]
+    [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]
   );
 
   const startListening = useCallback(() => {
@@ -797,12 +879,13 @@ export function QuizCenter({
     setCurrentRecord(timeoutRecord);
     setRecords((prev) => [...prev, timeoutRecord]);
     onRecordAnswer(currentQuestion.card.id, false, false);
+    enqueueRelearnQuestion(currentQuestion.card.id);
     triggerFeedback(false);
 
     setTimeout(() => {
       submissionLockRef.current = false;
     }, 300);
-  }, [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback]);
+  }, [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]);
 
   // --- Cooldown timer -------------------------------------------------------
   // Wall-clock deadline armed once per question; immune to effect re-runs,

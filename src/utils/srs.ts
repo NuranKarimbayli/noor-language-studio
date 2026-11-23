@@ -240,6 +240,13 @@ export function matchesSmartFilter(
   if (filter.leeches) checks.push(isLeechCard(card));
   if (filter.newOnly) checks.push(card.confidence === 'new');
   if (filter.hardOnly) checks.push(card.confidence === 'hard');
+  if (filter.tag) {
+    const wanted = filter.tag.trim().toLowerCase();
+    checks.push(
+      wanted.length > 0 &&
+        (card.tags ?? []).some((t) => t.toLowerCase() === wanted)
+    );
+  }
   return checks.length > 0 && checks.some(Boolean);
 }
 
@@ -299,4 +306,45 @@ export function getReviewForecast(
   }
 
   return { today, tomorrow, thisWeek };
+}
+
+/**
+ * Per-day due counts for the next `days` calendar days (index 0 = today).
+ * Uses the same local-midnight boundaries as getReviewForecast, so cards
+ * that were never scheduled or have unparseable dates count as due today.
+ */
+export function getDailyForecast(
+  cards: VocabCard[],
+  days = 7,
+  now: Date = new Date()
+): number[] {
+  const buckets = new Array<number>(days).fill(0);
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  // Precompute local-midnight boundaries (DST-safe via setDate)
+  const boundaries: number[] = [startOfToday.getTime()];
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(startOfToday);
+    d.setDate(d.getDate() + i);
+    boundaries.push(d.getTime());
+  }
+
+  for (const card of cards) {
+    if (card.suspended) continue;
+    const dueMs = card.nextReviewAt ? Date.parse(card.nextReviewAt) : NaN;
+    const effective = Number.isNaN(dueMs) ? 0 : dueMs;
+    // Never-scheduled/unparseable -> due today (bucket 0)
+    if (Number.isNaN(dueMs)) {
+      buckets[0] += 1;
+      continue;
+    }
+    for (let i = 0; i < days; i++) {
+      if (effective < boundaries[i + 1]) {
+        buckets[i] += 1;
+        break;
+      }
+    }
+    // due beyond the window -> not counted
+  }
+  return buckets;
 }

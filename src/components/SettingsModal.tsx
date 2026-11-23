@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Bell,
+  Download,
   FastForward,
   Keyboard,
   Monitor,
@@ -42,6 +43,9 @@ interface SettingsModalProps {
   onNotesAutoSaveChange: (enabled: boolean) => void;
   notesAutoSaveSeconds: number;
   onNotesAutoSaveSecondsChange: (seconds: number) => void;
+  canInstallApp?: boolean;
+  onInstallApp?: () => void;
+  lastBackupAt?: string;
 }
 
 function Toggle({
@@ -136,6 +140,9 @@ export function SettingsModal({
   onNotesAutoSaveChange,
   notesAutoSaveSeconds,
   onNotesAutoSaveSecondsChange,
+  canInstallApp = false,
+  onInstallApp,
+  lastBackupAt,
 }: SettingsModalProps) {
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -338,6 +345,30 @@ export function SettingsModal({
           )}
         </Section>
 
+        {/* App / PWA */}
+        {canInstallApp && onInstallApp && (
+          <Section icon={Download} title="App">
+            <div className="py-3 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
+                  Install Noor Language Studio
+                </div>
+                <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
+                  Add to your home screen or desktop for offline access and
+                  a dedicated window.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void onInstallApp()}
+                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#B45309] hover:bg-[#92400E] transition-colors"
+              >
+                Install
+              </button>
+            </div>
+          </Section>
+        )}
+
         {/* Danger Zone */}
         <Section icon={TriangleAlert} title="Danger Zone">
           <div className="py-3 flex items-start justify-between gap-4">
@@ -414,6 +445,21 @@ export function SettingsModal({
           Your languages, decks, words, difficulty ratings, and settings are{' '}
           <strong>not</strong> affected.
         </p>
+        {(() => {
+          const days = lastBackupAt
+            ? Math.floor((Date.now() - Date.parse(lastBackupAt)) / 86400000)
+            : null;
+          if (days === null || !Number.isFinite(days) || days < 14) return null;
+          return (
+            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed flex items-start gap-1.5">
+              <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Your last backup was {days} days ago — consider exporting one
+                from Statistics before resetting.
+              </span>
+            </p>
+          );
+        })()}
         <div>
           <label
             htmlFor="reset-confirm-input"

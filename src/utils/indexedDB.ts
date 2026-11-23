@@ -5,6 +5,7 @@ import {
   ConfidenceLevel,
   Deck,
   LanguageItem,
+  MasterySnapshot,
   Note,
   SessionRecord,
   SmartDeck,
@@ -66,10 +67,15 @@ interface NoorStudioDB extends DBSchema {
     key: string;
     value: Note;
   };
+  masterySnapshots: {
+    key: string;
+    value: MasterySnapshot;
+    indexes: { 'by-languageId': string };
+  };
 }
 
 const DB_NAME = 'noor-studio-db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const SEED_COMPLETED_KEY = 'seed-completed';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
@@ -128,6 +134,15 @@ function getDB(): Promise<IDBPDatabase<NoorStudioDB>> {
         // v7: study notepad notes
         if (!db.objectStoreNames.contains('notes')) {
           db.createObjectStore('notes', { keyPath: 'id' });
+        }
+        // v8: weekly per-language mastery snapshots for trend charts
+        if (!db.objectStoreNames.contains('masterySnapshots')) {
+          const store = db.createObjectStore('masterySnapshots', {
+            keyPath: 'id',
+          }) as unknown as {
+            createIndex: (indexName: string, keyPath: string) => unknown;
+          };
+          store.createIndex('by-languageId', 'languageId');
         }
       },
     }).catch((error) => {
@@ -542,6 +557,20 @@ export async function getAppPrefs(): Promise<AppPrefs> {
 export async function saveAppPrefs(prefs: AppPrefs): Promise<void> {
   const db = await getDB();
   await db.put('meta', prefs, APP_PREFS_KEY);
+}
+
+// Weekly mastery snapshots (Statistics trendline)
+export async function getMasterySnapshots(
+  languageId: string
+): Promise<MasterySnapshot[]> {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('masterySnapshots', 'by-languageId', languageId);
+  return all.sort((a, b) => a.weekKey.localeCompare(b.weekKey));
+}
+
+export async function putMasterySnapshot(snapshot: MasterySnapshot): Promise<void> {
+  const db = await getDB();
+  await db.put('masterySnapshots', snapshot);
 }
 
 // Notes operations (study notepad)

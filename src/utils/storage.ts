@@ -93,6 +93,33 @@ export function matchesDifficultyFilter(
   return !filter || filter.length === 0 || filter.includes(getCardDifficulty(card));
 }
 
+/**
+ * Parse a freeform tag input ("verbs, food; travel") into a normalized
+ * string array: trimmed, '#' stripped, deduplicated case-insensitively,
+ * capped at 12 tags of 24 chars each.
+ */
+export function parseCardTags(raw: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const part of raw.split(/[,;]+/)) {
+    const tag = part.trim().replace(/^#+/, '').slice(0, 24).trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+    if (tags.length >= 12) break;
+  }
+  return tags;
+}
+
+/** Normalize a tags field from untrusted data (import/backup). */
+export function normalizeCardTags(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tags = parseCardTags(raw.filter((t) => typeof t === 'string').join(','));
+  return tags.length > 0 ? tags : undefined;
+}
+
 export interface ExportDeckPayload {
   version: number;
   exportedAt: string;
@@ -106,6 +133,7 @@ export interface ExportDeckPayload {
       confidence?: ConfidenceLevel;
       difficulty?: DifficultyLevel;
       mnemonic?: string;
+      tags?: string[];
     }>;
   };
 }
@@ -124,6 +152,7 @@ export function exportDeckAsJson(deck: Deck, deckCards: VocabCard[]): void {
         confidence: c.confidence,
         difficulty: getCardDifficulty(c),
         ...(c.mnemonic ? { mnemonic: c.mnemonic } : {}),
+        ...(c.tags && c.tags.length > 0 ? { tags: c.tags } : {}),
       })),
     },
   };
@@ -183,6 +212,7 @@ export function parseImportedDeckJson(rawText: string): {
     confidence: ConfidenceLevel;
     difficulty?: DifficultyLevel;
     mnemonic?: string;
+    tags?: string[];
   }>;
 } {
   const parsed = JSON.parse(rawText);
@@ -204,6 +234,7 @@ export function parseImportedDeckJson(rawText: string): {
     confidence: ConfidenceLevel;
     difficulty?: DifficultyLevel;
     mnemonic?: string;
+    tags?: string[];
   }> = [];
 
   for (const item of rawCards) {
@@ -225,7 +256,8 @@ export function parseImportedDeckJson(rawText: string): {
       typeof item.mnemonic === 'string' && item.mnemonic.trim()
         ? item.mnemonic.trim()
         : undefined;
-    validCards.push({ word, translation, exampleSentence, confidence, difficulty, mnemonic });
+    const tags = normalizeCardTags(item.tags);
+    validCards.push({ word, translation, exampleSentence, confidence, difficulty, mnemonic, tags });
   }
 
   if (validCards.length === 0) {
@@ -386,6 +418,9 @@ export function parseBackupJson(rawText: string): FullBackupPayload {
           reviewCount: typeof c.reviewCount === 'number' ? c.reviewCount : 0,
           createdAt:
             typeof c.createdAt === 'string' ? c.createdAt : new Date().toISOString(),
+          tags: normalizeCardTags(c.tags),
+          linkedNoteId:
+            typeof c.linkedNoteId === 'string' && c.linkedNoteId ? c.linkedNoteId : undefined,
         }))
     : [];
 

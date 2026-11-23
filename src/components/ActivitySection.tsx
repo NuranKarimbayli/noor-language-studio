@@ -1,8 +1,8 @@
 import { memo, useMemo, useState } from 'react';
-import { Bug, Flame, History, Minus, Plus, Target, TrendingUp } from 'lucide-react';
-import { ActivityDay, SessionMode, SessionRecord, VocabCard } from '../types';
+import { Bug, CalendarClock, Flame, History, Minus, Plus, Target, TrendingUp } from 'lucide-react';
+import { ActivityDay, MasterySnapshot, SessionMode, SessionRecord, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
-import { isLeechCard } from '../utils/srs';
+import { getDailyForecast, isLeechCard } from '../utils/srs';
 
 interface ActivitySectionProps {
   activity: ActivityDay[];
@@ -13,6 +13,9 @@ interface ActivitySectionProps {
   onPracticeMistakes: (cardIds: string[]) => void;
   sessions: SessionRecord[];
   onStartLeechLab: () => void;
+  snapshots?: MasterySnapshot[];
+  lastBackupAt?: string;
+  onExportBackup?: () => void;
 }
 
 const HEATMAP_WEEKS = 16;
@@ -309,6 +312,9 @@ export function ActivitySection({
   onPracticeMistakes,
   sessions,
   onStartLeechLab,
+  snapshots = [],
+  lastBackupAt,
+  onExportBackup,
 }: ActivitySectionProps) {
   const activityByDate = useMemo(() => {
     const map = new Map<string, ActivityDay>();
@@ -371,6 +377,62 @@ export function ActivitySection({
   );
 
   const recentSessions = sessions.slice(0, 6);
+
+  // 7-day due forecast (calendar-day buckets, index 0 = today)
+  const forecast = useMemo(() => getDailyForecast(cards, 7), [cards]);
+  const forecastLabels = useMemo(() => {
+    const labels: string[] = [];
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      labels.push(
+        i === 0
+          ? 'Today'
+          : i === 1
+            ? 'Tmrw'
+            : d.toLocaleDateString(undefined, { weekday: 'short' })
+      );
+    }
+    return labels;
+  }, []);
+
+  // Per-deck accuracy — only single-deck sessions can be attributed
+  // honestly; multi-deck sessions are excluded rather than double-counted.
+  const perDeckAccuracy = useMemo(() => {
+    const acc = new Map<string, { total: number; correct: number }>();
+    for (const s of sessions) {
+      if (s.deckIds.length !== 1 || s.total <= 0) continue;
+      const id = s.deckIds[0];
+      const cur = acc.get(id) ?? { total: 0, correct: 0 };
+      cur.total += s.total;
+      cur.correct += s.correct;
+      acc.set(id, cur);
+    }
+    return [...acc.entries()]
+      .map(([deckId, v]) => ({
+        deckId,
+        name: deckNameFor(deckId),
+        total: v.total,
+        correct: v.correct,
+        pct: Math.round((v.correct / v.total) * 100),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [sessions, deckNameFor]);
+
+  // Mastery trend: latest weekly snapshots, oldest → newest
+  const masteryTrend = useMemo(
+    () => [...snapshots].sort((a, b) => a.weekKey.localeCompare(b.weekKey)).slice(-8),
+    [snapshots]
+  );
+
+  // Stale-backup reminder (>14 days)
+  const backupStaleDays = useMemo(() => {
+    if (!lastBackupAt) return null;
+    const days = Math.floor((Date.now() - Date.parse(lastBackupAt)) / 86400000);
+    return Number.isFinite(days) && days >= 14 ? days : null;
+  }, [lastBackupAt]);
 
   const adjustGoal = (delta: number) => {
     onDailyGoalChange(
@@ -470,6 +532,54 @@ export function ActivitySection({
             </p>
           )}
         </div>
+
+        {/* 7-day review forecast */}
+        <div className="pt-4 border-t border-slate-200 dark:border-[#2E2A25] space-y-2.5">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
+            <span className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
+              Upcoming Reviews
+            </span>
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {forecast.map((count, i) => (
+              <div
+                key={forecastLabels[i]}
+                className="rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200/70 dark:border-[#2E2A25] px-1 py-2 text-center"
+              >
+                <div className="text-[10px] font-medium text-[#78716C] dark:text-[#A8A29E] truncate">
+                  {forecastLabels[i]}
+                </div>
+                <div
+                  className={`font-mono text-sm font-semibold tabular-nums mt-0.5 ${
+                    count > 0
+                      ? 'text-[#B45309] dark:text-[#F59E0B]'
+                      : 'text-[#A8A29E] dark:text-[#57534E]'
+                  }`}
+                >
+                  {count}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Stale-backup nudge — subtle, only when backups are old */}
+          {backupStaleDays !== null && onExportBackup && (
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+              <span>
+                Last backup {backupStaleDays === 0 ? 'today' : `${backupStaleDays}d`} ago —
+                your data lives only in this browser.
+              </span>
+              <button
+                type="button"
+                onClick={onExportBackup}
+                className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-300 transition-colors"
+              >
+                Export now
+              </button>
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Weakness Radar / Mistake Bank */}
@@ -542,6 +652,45 @@ export function ActivitySection({
         )}
       </div>
     </section>
+
+    {/* Weekly mastery trend — snapshots are captured once per ISO week */}
+    {masteryTrend.length > 0 && (
+      <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+              Mastery Trend
+            </h3>
+            <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
+              Share of words at Leitner box 4+ — captured weekly
+            </p>
+          </div>
+          <TrendingUp className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />
+        </div>
+        <div className="flex items-end gap-2 h-24">
+          {masteryTrend.map((snap) => (
+            <div
+              key={snap.id}
+              className="flex-1 flex flex-col items-center gap-1 min-w-0"
+              title={`${snap.weekKey}: ${snap.masteryPct}% mastery (${snap.mastered}/${snap.total} mastered)`}
+            >
+              <span className="text-[10px] font-mono text-[#78716C] dark:text-[#A8A29E] tabular-nums">
+                {snap.masteryPct}%
+              </span>
+              <div className="w-full flex-1 flex items-end">
+                <div
+                  className="w-full rounded-t-md bg-[#B45309]/80 dark:bg-[#D97706]/80 transition-all duration-500"
+                  style={{ height: `${Math.max(4, snap.masteryPct)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-[#A8A29E] dark:text-[#57534E] truncate w-full text-center">
+                {snap.weekKey.slice(5)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
     {/* Session History & Accuracy Trend */}
     <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-4">
@@ -626,6 +775,42 @@ export function ActivitySection({
                 </li>
               );
             })}
+          </ul>
+        </div>
+      )}
+
+      {/* Per-deck accuracy — single-deck sessions only (honest attribution) */}
+      {perDeckAccuracy.length > 0 && (
+        <div className="pt-4 border-t border-slate-200 dark:border-[#2E2A25] space-y-2.5">
+          <div className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
+            Accuracy by deck
+            <span className="font-normal"> — single-deck sessions</span>
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
+            {perDeckAccuracy.map((d) => (
+              <li
+                key={d.deckId}
+                className="flex items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-[#1C1917] dark:text-[#F5F2EC] truncate">
+                  {d.name}
+                </span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-[#57534E] dark:text-[#A8A29E]">
+                  <span
+                    className={`font-semibold ${
+                      d.pct >= 80
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : d.pct >= 50
+                          ? 'text-amber-700 dark:text-amber-400'
+                          : 'text-red-700 dark:text-red-400'
+                    }`}
+                  >
+                    {d.pct}%
+                  </span>{' '}
+                  · {d.correct}/{d.total}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       )}
