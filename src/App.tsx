@@ -1880,7 +1880,11 @@ export default function App() {
                 onClick={toggleSfxMute}
                 aria-label={sfxMuted ? 'Unmute sound effects' : 'Mute sound effects'}
                 title={sfxMuted ? 'Sound effects muted' : 'Sound effects on'}
-                className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
+                className={`p-2 rounded-lg border transition-colors shrink-0 ${
+                  sfxMuted
+                    ? 'bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20'
+                    : 'bg-white dark:bg-[#1C1A17] border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                }`}
               >
                 {sfxMuted ? (
                   <VolumeX className="w-4 h-4" />
@@ -1894,7 +1898,11 @@ export default function App() {
                 onClick={toggleTtsMute}
                 aria-label={ttsMuted ? 'Enable pronunciation audio' : 'Disable pronunciation audio'}
                 title={ttsMuted ? 'Pronunciation audio off' : 'Pronunciation audio on'}
-                className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
+                className={`p-2 rounded-lg border transition-colors shrink-0 ${
+                  ttsMuted
+                    ? 'bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20'
+                    : 'bg-white dark:bg-[#1C1A17] border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                }`}
               >
                 {ttsMuted ? (
                   <MicOff className="w-4 h-4" />
@@ -2007,7 +2015,11 @@ export default function App() {
                 onClick={toggleSfxMute}
                 aria-label={sfxMuted ? 'Unmute sound effects' : 'Mute sound effects'}
                 title={sfxMuted ? 'Sound effects muted' : 'Sound effects on'}
-                className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
+                className={`p-2 rounded-lg transition-colors shrink-0 ${
+                  sfxMuted
+                    ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
+                    : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                }`}
               >
                 {sfxMuted ? (
                   <VolumeX className="w-4 h-4" />
@@ -2021,7 +2033,11 @@ export default function App() {
                 onClick={toggleTtsMute}
                 aria-label={ttsMuted ? 'Enable pronunciation audio' : 'Disable pronunciation audio'}
                 title={ttsMuted ? 'Pronunciation audio off' : 'Pronunciation audio on'}
-                className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
+                className={`p-2 rounded-lg transition-colors shrink-0 ${
+                  ttsMuted
+                    ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
+                    : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
+                }`}
               >
                 {ttsMuted ? (
                   <MicOff className="w-4 h-4" />

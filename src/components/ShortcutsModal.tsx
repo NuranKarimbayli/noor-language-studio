@@ -61,7 +61,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
       <div className="p-6">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="font-display text-lg font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
+            <h2 className="font-display text-lg font-semibold leading-snug text-[#1C1917] dark:text-[#F5F2EC]">
               Keyboard Shortcuts
             </h2>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
