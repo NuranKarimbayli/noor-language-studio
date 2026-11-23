@@ -1079,7 +1079,7 @@ export function DeckWorkspace({
                     </span>
                     {dueCount > 0 && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] font-medium">
-                        {dueCount} due
+                        {t('{count} due', { count: dueCount })}
                       </span>
                     )}
                     {mastery && count > 0 && (
@@ -1180,13 +1180,15 @@ export function DeckWorkspace({
                       className="text-emerald-700 dark:text-emerald-300 font-medium"
                       title={t('{mastered} mastered · {learning} learning · {fresh} new', { mastered: selectedDeckMastery.mastered, learning: selectedDeckMastery.learning, fresh: selectedDeckMastery.fresh })}
                     >
-                      {selectedDeckMastery.masteryPct}% mastery
+                      {t('{pct}% mastery', { pct: selectedDeckMastery.masteryPct })}
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
-                      {selectedDeckMastery.mastered} mastered ·{' '}
-                      {selectedDeckMastery.learning} learning ·{' '}
-                      {selectedDeckMastery.fresh} new
+                      {t('{mastered} mastered · {learning} learning · {fresh} new', {
+                        mastered: selectedDeckMastery.mastered,
+                        learning: selectedDeckMastery.learning,
+                        fresh: selectedDeckMastery.fresh,
+                      })}
                     </span>
                   </>
                 )}
@@ -1604,7 +1606,7 @@ export function DeckWorkspace({
                         <span
                           className={`text-xs font-medium capitalize ${confidenceStyle(card.confidence)}`}
                         >
-                          {card.confidence}
+                          {t(card.confidence)}
                         </span>
 
                         <div className="relative">

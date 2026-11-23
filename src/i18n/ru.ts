@@ -796,6 +796,23 @@ export const RU: Record<string, string> = {
   'Submit / Continue': 'Ответить / Далее',
   'Close dialog / menu': 'Закрыть диалог / меню',
   'Command palette (Cmd on Mac)': 'Палитра команд (Cmd на Mac)',
+
+  // --- Audit pass 3: confidence / mastery / breakdown labels ---
+  'new': 'новая',
+  'good': 'хорошо',
+  'mastery': 'освоение',
+  'mastered': 'выучено',
+  'learning': 'в процессе',
+  '{count} due': '{count} к повторению',
+  '{pct}% mastery': 'освоено {pct}%',
+  'across {count} {decks}': 'в {count} {decks}',
+  '{count} {words} marked hard or missed recently': '{count} {words} отмечены как трудные или недавно пропущены',
+  '{count} {words} ready in your spaced queue': '{count} {words} готовы в очереди повторений',
+  'Weak Words ({count})': 'Слабые слова ({count})',
+  '/ {total} easy': '/ {total} лёгких',
+  '{count} in progress (Good)': '{count} в процессе (хорошо)',
+  'Word · {confidence}': 'Слово · {confidence}',
+  'Translation · {confidence}': 'Перевод · {confidence}',
 };
 
 // Russian one/few/many plural forms keyed by the English singular noun.

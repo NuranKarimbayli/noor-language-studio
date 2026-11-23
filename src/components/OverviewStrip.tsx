@@ -3,7 +3,7 @@ import { CalendarClock, Flame, RefreshCw, Shuffle, Zap } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getReviewForecast, isCardDue, isWeakCard } from '../utils/srs';
-import { t } from '../i18n';
+import { pluralize, t } from '../i18n';
 
 interface OverviewStripProps {
   languageId: string;
@@ -139,8 +139,14 @@ export function OverviewStrip({
                 {cards.length === 0
                   ? t('Add vocabulary words to unlock adaptive review.')
                   : weakCount > 0
-                    ? `${weakCount} ${weakCount === 1 ? 'word' : 'words'} marked hard or missed recently`
-                    : `${dueCount} ${dueCount === 1 ? 'word' : 'words'} ready in your spaced queue`}
+                    ? t('{count} {words} marked hard or missed recently', {
+                        count: weakCount,
+                        words: pluralize(weakCount, 'word', 'words'),
+                      })
+                    : t('{count} {words} ready in your spaced queue', {
+                        count: dueCount,
+                        words: pluralize(dueCount, 'word', 'words'),
+                      })}
               </p>
             </div>
 
@@ -151,7 +157,7 @@ export function OverviewStrip({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#25221E] border border-[#B45309]/40 dark:border-[#D97706]/50 hover:bg-[#B45309] hover:text-white dark:hover:bg-[#D97706] dark:hover:text-[#121110] hover:-translate-y-px hover:shadow-md text-xs sm:text-sm font-semibold text-[#B45309] dark:text-[#F59E0B] transition-all duration-200 ease-out whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span>{weakCount > 0 ? `Weak Words (${weakCount})` : t('Smart Review')}</span>
+              <span>{weakCount > 0 ? t('Weak Words ({count})', { count: weakCount }) : t('Smart Review')}</span>
             </button>
           </div>
         </div>
@@ -217,7 +223,10 @@ export function OverviewStrip({
             {cards.length}
           </div>
           <span className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
-            across {decks.length} {decks.length === 1 ? 'deck' : 'decks'}
+            {t('across {count} {decks}', {
+              count: decks.length,
+              decks: pluralize(decks.length, 'deck', 'decks'),
+            })}
           </span>
         </div>
 
@@ -235,7 +244,7 @@ export function OverviewStrip({
             <div className="font-mono text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
               {easyCount}{' '}
               <span className="text-sm font-sans font-normal text-[#78716C] dark:text-[#A8A29E]">
-                / {cards.length} easy
+                {t('/ {total} easy', { total: cards.length })}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-[#E6E1D8] dark:bg-[#2E2A25] overflow-hidden">
@@ -246,7 +255,7 @@ export function OverviewStrip({
             </div>
           </div>
           <span className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
-            {goodCount} in progress (Good)
+            {t('{count} in progress (Good)', { count: goodCount })}
           </span>
         </div>
 

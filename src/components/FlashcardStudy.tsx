@@ -723,8 +723,8 @@ export function FlashcardStudy({
                   <div className="flex items-center justify-between text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
                     <span>
                       {currentItem.promptSide === 'word'
-                        ? `Word · ${liveCard.confidence}`
-                        : `Translation · ${liveCard.confidence}`}
+                        ? t('Word · {confidence}', { confidence: t(liveCard.confidence) })
+                        : t('Translation · {confidence}', { confidence: t(liveCard.confidence) })}
                     </span>
                     <span className="font-mono tabular-nums">
                       Box {liveCard.srsBox ?? 1}/5
