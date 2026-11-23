@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Note } from '../types';
+import { t } from '../i18n';
 
 type SaveStatus = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -20,20 +21,20 @@ const STATUS_STYLES: Record<
   SaveStatus,
   { label: string; className: string; icon: typeof Check }
 > = {
-  clean: { label: 'Saved', className: 'text-emerald-700 dark:text-emerald-400', icon: Check },
-  dirty: { label: 'Unsaved changes', className: 'text-amber-700 dark:text-amber-400', icon: CloudOff },
-  saving: { label: 'Saving…', className: 'text-[#78716C] dark:text-[#A8A29E]', icon: Loader2 },
-  saved: { label: 'Saved', className: 'text-emerald-700 dark:text-emerald-400', icon: Check },
-  error: { label: 'Save failed', className: 'text-red-700 dark:text-red-400', icon: CloudOff },
+  clean: { label: t('Saved'), className: 'text-emerald-700 dark:text-emerald-400', icon: Check },
+  dirty: { label: t('Unsaved changes'), className: 'text-amber-700 dark:text-amber-400', icon: CloudOff },
+  saving: { label: t('Saving…'), className: 'text-[#78716C] dark:text-[#A8A29E]', icon: Loader2 },
+  saved: { label: t('Saved'), className: 'text-emerald-700 dark:text-emerald-400', icon: Check },
+  error: { label: t('Save failed'), className: 'text-red-700 dark:text-red-400', icon: CloudOff },
 };
 
 function noteTitle(note: Note): string {
-  return note.title?.trim() || 'Untitled note';
+  return note.title?.trim() || t('Untitled note');
 }
 
 function notePreview(note: Note): string {
   const text = note.content.replace(/\s+/g, ' ').trim();
-  return text.length > 48 ? `${text.slice(0, 48)}…` : text || 'Empty note';
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text || t('Empty note');
 }
 
 function formatNoteDate(iso: string): string {
@@ -148,7 +149,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
     });
     win.document.write(
       `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>` +
-        `<style>body{font-family:Georgia,'Times New Roman',serif;max-width:640px;margin:48px auto;padding:0 24px;color:#1c1917;line-height:1.75}h1{font-size:24px;margin-bottom:4px}h1{font-weight:600}.meta{color:#78716c;font-size:12px;margin-bottom:28px}.content{font-size:15px;white-space:normal}@media print{body{margin:24px}}</style>` +
+        `<style>body{font-family:Georgia,t('Times New Roman'),serif;max-width:640px;margin:48px auto;padding:0 24px;color:#1c1917;line-height:1.75}h1{font-size:24px;margin-bottom:4px}h1{font-weight:600}.meta{color:#78716c;font-size:12px;margin-bottom:28px}.content{font-size:15px;white-space:normal}@media print{body{margin:24px}}</style>` +
         `</head><body><h1>${title}</h1><div class="meta">${updated}</div><div class="content">${bodyHtml}</div>` +
         `<scr` + `ipt>window.addEventListener('load',()=>window.print())</scr` + `ipt></body></html>`
     );
@@ -184,7 +185,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
             aria-live="polite"
           >
             <StatusIcon className={`w-3.5 h-3.5 ${status === 'saving' ? 'animate-spin' : ''}`} />
-            {statusInfo.label}
+            {t(statusInfo.label)}
           </span>
           {!autoSave && (
             <button
@@ -194,7 +195,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:pointer-events-none"
             >
               <Save className="w-3.5 h-3.5" />
-              Save
+              {t('Save')}
             </button>
           )}
         </div>
@@ -204,7 +205,7 @@ function NoteEditor({ note, autoSave, intervalSeconds, onPersist }: NoteEditorPr
       <textarea
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder="Jot down grammar rules, example sentences, tricky words, or anything worth remembering…"
+        placeholder={t('Jot down grammar rules, example sentences, tricky words, or anything worth remembering…')}
         aria-label={`Note: ${noteTitle(note)}`}
         spellCheck
         className="flex-1 min-h-[20rem] w-full resize-none bg-transparent px-5 py-4 text-sm leading-relaxed text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#A8A29E] dark:placeholder:text-[#57534E] focus:outline-none"
@@ -301,7 +302,7 @@ export function NotesPanel({
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-[11px] font-semibold transition-colors"
           >
             <Plus className="w-3 h-3" />
-            New
+            {t('New')}
           </button>
         </div>
         <ul className="max-h-72 lg:max-h-[26rem] overflow-y-auto divide-y divide-slate-100 dark:divide-[#2E2A25] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]">
@@ -339,7 +340,7 @@ export function NotesPanel({
                             }}
                             onClick={(e) => e.stopPropagation()}
                             className="flex-1 min-w-0 text-sm font-medium bg-transparent border-b border-[#B45309] outline-none text-[#1C1917] dark:text-[#F5F2EC]"
-                            aria-label="Rename note"
+                            aria-label={t('Rename note')}
                           />
                         ) : (
                           <span className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] truncate">
@@ -365,7 +366,7 @@ export function NotesPanel({
                             setRenameDraft(note.title ?? '');
                           }}
                           aria-label={`Rename ${noteTitle(note)}`}
-                          title="Rename"
+                          title={t('Rename')}
                           className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors"
                         >
                           <Pencil className="w-3 h-3" />
@@ -374,7 +375,7 @@ export function NotesPanel({
                           type="button"
                           onClick={() => onTogglePin(note.id)}
                           aria-label={note.pinned ? `Unpin ${noteTitle(note)}` : `Pin ${noteTitle(note)}`}
-                          title={note.pinned ? 'Unpin' : 'Pin to top'}
+                          title={note.pinned ? t('Unpin') : t('Pin to top')}
                           className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white dark:hover:bg-[#1C1A17] transition-colors"
                         >
                           {note.pinned ? (
@@ -387,7 +388,7 @@ export function NotesPanel({
                           type="button"
                           onClick={() => onDeleteNote(note.id)}
                           aria-label={`Delete ${noteTitle(note)}`}
-                          title="Delete"
+                          title={t('Delete')}
                           className="p-1 rounded-md text-red-700/70 dark:text-red-400/70 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -401,7 +402,7 @@ export function NotesPanel({
           })}
           {sortedNotes.length === 0 && (
             <li className="px-4 py-6 text-center text-xs text-[#78716C] dark:text-[#A8A29E]">
-              No notes yet — create your first sheet.
+              {t('No notes yet — create your first sheet.')}
             </li>
           )}
         </ul>
@@ -419,7 +420,7 @@ export function NotesPanel({
           />
         ) : (
           <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-10 text-center text-sm text-[#78716C] dark:text-[#A8A29E]">
-            Select or create a note to start writing.
+            {t('Select or create a note to start writing.')}
           </div>
         )}
       </div>

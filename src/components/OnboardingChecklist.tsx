@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Check, Circle, X } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
+import { t } from '../i18n';
 
 interface OnboardingChecklistProps {
   decks: Deck[];
@@ -25,10 +26,10 @@ export function OnboardingChecklist({
     const hasSession =
       stats.totalQuizAnswered > 0 || stats.streakDays > 0 || stats.totalQuizCorrect > 0;
     return [
-      { label: 'Create a deck for this language', done: decks.length > 0, hint: 'Use the deck selector in Words to add one' },
-      { label: 'Add your first words', done: cards.length > 0, hint: 'Press "+ New Word" or bulk-import a list' },
-      { label: 'Complete a study session', done: hasSession, hint: 'Start a quiz or flashcard round from Quiz' },
-      { label: 'Check your progress', done: false, hint: 'Stats, forecast and session history live under Statistics' },
+      { label: t('Create a deck for this language'), done: decks.length > 0, hint: t('Use the deck selector in Words to add one') },
+      { label: t('Add your first words'), done: cards.length > 0, hint: t('Press "+ New Word" or bulk-import a list') },
+      { label: t('Complete a study session'), done: hasSession, hint: t('Start a quiz or flashcard round from Quiz') },
+      { label: t('Check your progress'), done: false, hint: t('Stats, forecast and session history live under Statistics') },
     ];
   }, [decks.length, cards.length, stats]);
 
@@ -40,7 +41,7 @@ export function OnboardingChecklist({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-            Get started
+            {t('Get started')}
           </div>
           <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5 tabular-nums">
             {doneCount} of {steps.length - 1} setup steps complete
@@ -49,7 +50,7 @@ export function OnboardingChecklist({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss getting started checklist"
+          aria-label={t('Dismiss getting started checklist')}
           className="p-1.5 -m-1 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
         >
           <X className="w-4 h-4" />
@@ -63,7 +64,7 @@ export function OnboardingChecklist({
         aria-valuenow={doneCount}
         aria-valuemin={0}
         aria-valuemax={steps.length - 1}
-        aria-label="Getting started progress"
+        aria-label={t('Getting started progress')}
       >
         <div
           className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400 transition-[width] duration-500 ease-out"
@@ -92,7 +93,7 @@ export function OnboardingChecklist({
               }`}
             >
               <span className="relative">
-                {step.label}
+                {t(step.label)}
                 {/* Animated strikethrough — scales in when the step completes */}
                 <span
                   aria-hidden="true"
@@ -102,7 +103,7 @@ export function OnboardingChecklist({
                 />
               </span>
               {!step.done && (
-                <span className="block text-[11px] text-[#78716C] dark:text-[#A8A29E]">{step.hint}</span>
+                <span className="block text-[11px] text-[#78716C] dark:text-[#A8A29E]">{t(step.hint)}</span>
               )}
             </span>
           </li>

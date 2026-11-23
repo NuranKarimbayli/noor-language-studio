@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
 import { ToastMessage } from '../types';
+import { t } from '../i18n';
 
 interface ToastContainerProps {
   toasts: ToastMessage[];
@@ -82,7 +83,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
                 whileTap={{ scale: 0.88 }}
                 onClick={() => onDismiss(toast.id)}
                 className="p-0.5 rounded text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
-                aria-label="Dismiss notification"
+                aria-label={t('Dismiss notification')}
               >
                 <X className="w-3.5 h-3.5" />
               </motion.button>

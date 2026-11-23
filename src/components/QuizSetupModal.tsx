@@ -26,6 +26,7 @@ import { createBlankedSentence } from '../utils/textUtils';
 import { getCardDifficulty } from '../utils/storage';
 import { isCardDue, isLeechCard } from '../utils/srs';
 import { isSpeechRecognitionSupported, isVoiceSupported, useBrowserVoices, VoiceSelection } from '../utils/speechUtils';
+import { t } from '../i18n';
 
 interface QuizSetupModalProps {
   open: boolean;
@@ -42,9 +43,9 @@ interface QuizSetupModalProps {
 }
 
 const DIFFICULTY_OPTIONS: Array<{ id: DifficultyLevel; label: string }> = [
-  { id: 'easy', label: 'Easy' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'hard', label: 'Hard' },
+  { id: 'easy', label: t('Easy') },
+  { id: 'medium', label: t('Medium') },
+  { id: 'hard', label: t('Hard') },
 ];
 
 const MODE_OPTIONS: Array<{
@@ -55,44 +56,44 @@ const MODE_OPTIONS: Array<{
 }> = [
   {
     id: 'flashcards',
-    title: 'Flashcards',
-    desc: '3D flip cards with Hard, Good, and Easy self-rating.',
+    title: t('Flashcards'),
+    desc: t('3D flip cards with Hard, Good, and Easy self-rating.'),
     icon: BookOpen,
   },
   {
     id: 'true-false',
-    title: 'True / False',
-    desc: 'Quickly verify whether a word and translation match.',
+    title: t('True / False'),
+    desc: t('Quickly verify whether a word and translation match.'),
     icon: CheckCheck,
   },
   {
     id: 'multiple-choice',
-    title: 'Multiple Choice',
-    desc: 'Pick the right answer from 4 dynamic options.',
+    title: t('Multiple Choice'),
+    desc: t('Pick the right answer from 4 dynamic options.'),
     icon: ListChecks,
   },
   {
     id: 'listening',
-    title: 'Listening Quiz',
-    desc: 'Hear the word aloud, then choose its meaning.',
+    title: t('Listening Quiz'),
+    desc: t('Hear the word aloud, then choose its meaning.'),
     icon: Headphones,
   },
   {
     id: 'typing',
-    title: 'Written / Typing',
-    desc: 'Type translations manually with 1-char typo tolerance.',
+    title: t('Written / Typing'),
+    desc: t('Type translations manually with 1-char typo tolerance.'),
     icon: Keyboard,
   },
   {
     id: 'fill-blank',
-    title: 'Fill-in-the-blanks',
-    desc: 'Complete missing words inside example sentences.',
+    title: t('Fill-in-the-blanks'),
+    desc: t('Complete missing words inside example sentences.'),
     icon: TextCursorInput,
   },
   {
     id: 'speaking',
-    title: 'Speaking Practice',
-    desc: 'Hear the meaning, then say the word aloud. Chrome/Edge only.',
+    title: t('Speaking Practice'),
+    desc: t('Hear the meaning, then say the word aloud. Chrome/Edge only.'),
     icon: Mic,
   },
 ];
@@ -303,13 +304,13 @@ export function QuizSetupModal({
               Start {languageName} Session
             </h2>
             <p className="text-xs sm:text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
-              Choose a study or testing mode and customize your decks below.
+              {t('Choose a study or testing mode and customize your decks below.')}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close setup modal"
+            aria-label={t('Close setup modal')}
             className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
           >
             <X className="w-5 h-5" />
@@ -319,7 +320,7 @@ export function QuizSetupModal({
         {/* 1. Visual Mode Selector */}
         <div className="space-y-3">
           <div className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-            1. Mode
+            {t('1. Mode')}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {MODE_OPTIONS.map((opt) => {
@@ -331,11 +332,11 @@ export function QuizSetupModal({
                   (!SPEAKING_PRACTICE_ENABLED || !recognitionSupported));
               const disabledHint =
                 opt.id === 'listening' && !voiceSupported
-                  ? 'Listening quiz requires a supported browser voice for this language.'
+                  ? t('Listening quiz requires a supported browser voice for this language.')
                   : opt.id === 'speaking' && !SPEAKING_PRACTICE_ENABLED
-                    ? 'Speaking Practice is coming soon.'
+                    ? t('Speaking Practice is coming soon.')
                     : opt.id === 'speaking' && !recognitionSupported
-                      ? 'Speaking practice requires Chrome or Edge (speech recognition).'
+                      ? t('Speaking practice requires Chrome or Edge (speech recognition).')
                       : undefined;
               return (
                 <button
@@ -361,11 +362,11 @@ export function QuizSetupModal({
                       }`}
                     />
                     <span className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                      {opt.title}
+                      {t(opt.title)}
                     </span>
                   </div>
                   <p className="text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
-                    {opt.desc}
+                    {t(opt.desc)}
                     {opt.id === 'fill-blank' && (
                       <span className="block mt-1 font-mono text-[11px] text-[#B45309] dark:text-[#F59E0B] tabular-nums">
                         {blankEligibleCards.length} eligible sentences
@@ -373,7 +374,7 @@ export function QuizSetupModal({
                     )}
                     {opt.id === 'speaking' && !SPEAKING_PRACTICE_ENABLED && (
                       <span className="block mt-1 text-[11px] font-semibold text-[#B45309] dark:text-[#F59E0B]">
-                        Coming soon
+                        {t('Coming soon')}
                       </span>
                     )}
                   </p>
@@ -401,7 +402,7 @@ export function QuizSetupModal({
         <div className="space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-              2. Decks
+              {t('2. Decks')}
             </span>
             <div className="flex items-center gap-3 text-xs font-medium">
               <button
@@ -409,14 +410,14 @@ export function QuizSetupModal({
                 onClick={() => setSelectedDeckIds(decks.map((d) => d.id))}
                 className="text-[#B45309] dark:text-[#F59E0B] hover:underline"
               >
-                Select All
+                {t('Select All')}
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedDeckIds([])}
                 className="text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
               >
-                Clear
+                {t('Clear')}
               </button>
             </div>
           </div>
@@ -464,14 +465,14 @@ export function QuizSetupModal({
             (meaning → word). Mixed alternates per question for balanced practice. */}
         <div className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-            Direction
+            {t('Direction')}
           </span>
           <div className="grid grid-cols-3 gap-1.5">
             {(
               [
-                { id: 'word-to-translation', label: 'Word → Meaning' },
-                { id: 'translation-to-word', label: 'Meaning → Word' },
-                { id: 'random', label: 'Mixed' },
+                { id: 'word-to-translation', label: t('Word → Meaning') },
+                { id: 'translation-to-word', label: t('Meaning → Word') },
+                { id: 'random', label: t('Mixed') },
               ] as const
             ).map((opt) => (
               <button
@@ -484,7 +485,7 @@ export function QuizSetupModal({
                     : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
                 }`}
               >
-                {opt.label}
+                {t(opt.label)}
               </button>
             ))}
           </div>
@@ -498,11 +499,11 @@ export function QuizSetupModal({
         <div className="space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-              3. Difficulty
+              {t('3. Difficulty')}
             </span>
             <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
               {difficulties.length === 0
-                ? 'All difficulties'
+                ? t('All difficulties')
                 : `${difficultyFilteredCards.length} matching words`}
             </span>
           </div>
@@ -516,7 +517,7 @@ export function QuizSetupModal({
                   : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
               }`}
             >
-              All
+              {t('All')}
             </button>
             {DIFFICULTY_OPTIONS.map((opt) => {
               const active = difficulties.includes(opt.id);
@@ -541,7 +542,7 @@ export function QuizSetupModal({
                       : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
                   }`}
                 >
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
               );
             })}
@@ -554,7 +555,7 @@ export function QuizSetupModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-                  4. Count
+                  {t('4. Count')}
                 </span>
                 <span className="font-mono font-semibold text-[#B45309] dark:text-[#F59E0B] tabular-nums">
                   {effectiveCount} / {maxEligibleCount}
@@ -601,7 +602,7 @@ export function QuizSetupModal({
                   onClick={() => setQuestionCount(maxEligibleCount)}
                   className="px-2 py-1 text-xs font-medium rounded-md bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309] disabled:opacity-40"
                 >
-                  All
+                  {t('All')}
                 </button>
               </div>
             </div>
@@ -609,11 +610,11 @@ export function QuizSetupModal({
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
                 <Clock className="w-3.5 h-3.5" />
-                <span>5. Timer</span>
+                <span>{t('5. Timer')}</span>
               </div>
               {mode === 'flashcards' ? (
                 <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                  Flashcards are self-paced.
+                  {t('Flashcards are self-paced.')}
                 </p>
               ) : (
                 <div className="grid grid-cols-5 gap-1.5">
@@ -628,7 +629,7 @@ export function QuizSetupModal({
                           : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E]'
                       }`}
                     >
-                      {sec === 0 ? 'Off' : `${sec}s`}
+                      {sec === 0 ? t('Off') : `${sec}s`}
                     </button>
                   ))}
                 </div>
@@ -647,7 +648,7 @@ export function QuizSetupModal({
                 />
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
-                    Same-Deck Options Only
+                    {t('Same-Deck Options Only')}
                   </span>
                   <span className="block text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed mt-0.5">
                     Incorrect options are drawn from the same deck as the question
@@ -667,7 +668,7 @@ export function QuizSetupModal({
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
                   <CalendarClock className="w-3.5 h-3.5 text-[#B45309] dark:text-[#F59E0B]" />
-                  Due Reviews Only
+                  {t('Due Reviews Only')}
                 </span>
                 <span className="block text-xs text-[#57534E] dark:text-[#A8A29E] leading-relaxed mt-0.5">
                   Restrict this session to cards whose spaced-repetition review
@@ -681,7 +682,7 @@ export function QuizSetupModal({
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E] flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    Leech cards
+                    {t('Leech cards')}
                   </span>
                   <span className="text-[#78716C] dark:text-[#A8A29E] tabular-nums">
                     {leechCount} stubborn {leechCount === 1 ? 'word' : 'words'}
@@ -690,9 +691,9 @@ export function QuizSetupModal({
                 <div className="grid grid-cols-3 gap-1.5">
                   {(
                     [
-                      { id: 'all', label: 'All' },
-                      { id: 'exclude', label: 'Exclude' },
-                      { id: 'only', label: 'Only leeches' },
+                      { id: 'all', label: t('All') },
+                      { id: 'exclude', label: t('Exclude') },
+                      { id: 'only', label: t('Only leeches') },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -705,7 +706,7 @@ export function QuizSetupModal({
                           : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.label)}
                     </button>
                   ))}
                 </div>
@@ -724,10 +725,10 @@ export function QuizSetupModal({
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
               {selectedDeckIds.length === 0
-                ? 'Select at least one deck to begin.'
+                ? t('Select at least one deck to begin.')
                 : mode === 'fill-blank'
-                  ? 'Selected decks have no example sentences containing the target word.'
-                  : 'Selected decks contain no words yet.'}
+                  ? t('Selected decks have no example sentences containing the target word.')
+                  : t('Selected decks contain no words yet.')}
             </span>
           </div>
         )}
@@ -739,7 +740,7 @@ export function QuizSetupModal({
             onClick={onClose}
             className="px-4 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
           >
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             type="button"

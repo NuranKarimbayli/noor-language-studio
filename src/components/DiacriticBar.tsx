@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DIACRITIC_PRESETS, getDiacriticsForLang } from '../utils/textUtils';
+import { t } from '../i18n';
 
 interface DiacriticBarProps {
   langCode: string;
@@ -28,11 +29,11 @@ export function DiacriticBar({
     <div className="flex flex-col gap-2 pt-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-medium text-[#57534E] dark:text-[#A8A29E]">
-          Quick-insert characters
+          {t('Quick-insert characters')}
         </span>
         <div className="flex items-center gap-1.5">
           <select
-            aria-label="Character set"
+            aria-label={t('Character set')}
             value={activePreset.id}
             onChange={(e) => setSelectedPresetId(e.target.value)}
             disabled={disabled}
@@ -40,7 +41,7 @@ export function DiacriticBar({
           >
             {DIACRITIC_PRESETS.map((preset) => (
               <option key={preset.id} value={preset.id}>
-                {preset.label}
+                {t(preset.label)}
               </option>
             ))}
           </select>
@@ -55,7 +56,7 @@ export function DiacriticBar({
                 : 'bg-white dark:bg-[#1C1A17] text-[#57534E] dark:text-[#A8A29E] border-[#E6E1D8] dark:border-[#2E2A25] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
             }`}
           >
-            Shift
+            {t('Shift')}
           </button>
         </div>
       </div>

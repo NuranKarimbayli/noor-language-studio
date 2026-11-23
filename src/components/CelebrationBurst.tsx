@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { t } from '../i18n';
 
 interface CelebrationBurstProps {
   active: boolean;

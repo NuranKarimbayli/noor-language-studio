@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { CommandPalette, type PaletteActionId } from './components/CommandPalette';
+import { setUiLanguage, t } from './i18n';
 import { DeckWorkspace } from './components/DeckWorkspace';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FlashcardStudy } from './components/FlashcardStudy';
@@ -185,6 +186,10 @@ export default function App() {
     autoSpeakAnswer: false,
     reminderEnabled: false,
   });
+  // Keep the module-level UI language in sync during render so every t()
+  // call in children already resolves the active locale.
+  setUiLanguage(appPrefs.uiLanguage ?? 'en');
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('words');
@@ -252,7 +257,7 @@ export default function App() {
         setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
         setSelectedDeckId(loadedDecks[0]?.id ?? '');
       } catch (error) {
-        console.error('Failed to initialize database:', error);
+        console.error(t('Failed to initialize database:'), error);
         // Keep the app usable even if IndexedDB is unavailable (e.g. private mode)
         setLanguages(PRESET_LANGUAGES);
         setDecks(SEED_DECKS);
@@ -332,7 +337,7 @@ export default function App() {
       if (localStorage.getItem('noor_last_review_reminder') === today) return;
       localStorage.setItem('noor_last_review_reminder', today);
       try {
-        const notification = new Notification('Noor Language Studio', {
+        const notification = new Notification(t('Noor Language Studio'), {
           body: `${due} ${due === 1 ? 'card is' : 'cards are'} due for review today.`,
         });
         notification.onclick = () => window.focus();
@@ -484,7 +489,7 @@ export default function App() {
       autoSpeakAnswer: false,
       reminderEnabled: false,
     });
-    notify('Settings reset to defaults', 'success');
+    notify(t('Settings reset to defaults'), 'success');
   };
 
   // Wipe study progress (stats, activity, session history, per-card SRS)
@@ -502,7 +507,7 @@ export default function App() {
       totalQuizCorrect: 0,
       bestQuizStreak: 0,
     }));
-    notify('Study statistics reset — progress history cleared', 'success');
+    notify(t('Study statistics reset — progress history cleared'), 'success');
   }, [notify]);
 
   // Record daily study activity (reviews / quizzes) into IndexedDB
@@ -596,7 +601,7 @@ export default function App() {
       const target = languages.find((l) => l.id === languageId);
       if (!target) return;
       if (languages.length <= 1) {
-        notify('You must keep at least one language', 'error');
+        notify(t('You must keep at least one language'), 'error');
         return;
       }
 
@@ -628,7 +633,7 @@ export default function App() {
         setStage('languages');
       }
       notify(`Removed "${target.name}"`, 'info', {
-        label: 'Undo',
+        label: t('Undo'),
         onAction: () => {
           void Promise.all([
             addLanguage(target),
@@ -714,7 +719,7 @@ export default function App() {
       }
       if (removedDeck) {
         notify(`Deleted "${removedDeck.name}"`, 'info', {
-          label: 'Undo',
+          label: t('Undo'),
           onAction: () => {
             void Promise.all([addDeck(removedDeck), putCards(removedCards)])
               .then(() => {
@@ -840,7 +845,7 @@ export default function App() {
     }
     if (removed) {
       notify(`Removed "${removed.word}"`, 'info', {
-        label: 'Undo',
+        label: t('Undo'),
         onAction: () => {
           void addCard(removed)
             .then(() => {
@@ -997,7 +1002,7 @@ export default function App() {
   const handleCreateNote = useCallback(async () => {
     const note: Note = {
       id: createId('note'),
-      title: 'Untitled note',
+      title: t('Untitled note'),
       content: '',
       updatedAt: new Date().toISOString(),
     };
@@ -1052,8 +1057,8 @@ export default function App() {
         void putCards(clearedCards).catch(console.error);
       }
       if (removed) {
-        notify(`Deleted "${removed.title?.trim() || 'Untitled note'}"`, 'info', {
-          label: 'Undo',
+        notify(`Deleted "${removed.title?.trim() || t('Untitled note')}"`, 'info', {
+          label: t('Undo'),
           onAction: () => {
             void putNote(removed)
               .then(() => setNotes((prev) => [...prev, removed]))
@@ -1103,7 +1108,7 @@ export default function App() {
         setNotesFocusId(note.id);
         notify(`Sent "${card.word}" to Blacknotes`, 'success');
       } catch {
-        notify('Could not create the note. Please try again.', 'error');
+        notify(t('Could not create the note. Please try again.'), 'error');
       }
     },
     [notes, notify]
@@ -1123,7 +1128,7 @@ export default function App() {
         mode: summary.mode,
         deckIds: activeSession?.deckIds ?? [],
         deckNames: (activeSession?.deckIds ?? []).map(
-          (id) => deckNameById.get(id) ?? 'Deck'
+          (id) => deckNameById.get(id) ?? t('Deck')
         ),
         total: summary.total,
         correct: summary.correct,
@@ -1199,7 +1204,7 @@ export default function App() {
   const handleStartLeechLab = useCallback(() => {
     const leeches = languageCards.filter((c) => !c.suspended && isLeechCard(c));
     if (leeches.length === 0) {
-      notify('No leech cards right now — nice work', 'info');
+      notify(t('No leech cards right now — nice work'), 'info');
       return;
     }
     beginSession({
@@ -1217,7 +1222,7 @@ export default function App() {
   const handleStartDueReview = useCallback(() => {
     const due = languageCards.filter((c) => !c.suspended && isCardDue(c));
     if (due.length === 0) {
-      notify('Nothing due for review right now', 'info');
+      notify(t('Nothing due for review right now'), 'info');
       return;
     }
     beginSession({
@@ -1257,7 +1262,7 @@ export default function App() {
       setSmartDecks((prev) => prev.filter((s) => s.id !== smartDeckId));
       if (removed) {
         notify(`Deleted smart deck "${removed.name}"`, 'info', {
-          label: 'Undo',
+          label: t('Undo'),
           onAction: () => {
             void addSmartDeck(removed)
               .then(() => {
@@ -1310,7 +1315,7 @@ export default function App() {
         `Deleted ${removed.length} ${removed.length === 1 ? 'word' : 'words'}`,
         'info',
         {
-          label: 'Undo',
+          label: t('Undo'),
           onAction: () => {
             void putCards(removed)
               .then(() => {
@@ -1353,7 +1358,7 @@ export default function App() {
         `${updated.length} ${updated.length === 1 ? 'word' : 'words'} ${what}`,
         'success',
         {
-          label: 'Undo',
+          label: t('Undo'),
           onAction: () => {
             void putCards(targets)
               .then(() => {
@@ -1409,9 +1414,9 @@ export default function App() {
           ...prev,
           lastBackupAt: new Date().toISOString(),
         }));
-        notify('Backup exported as JSON', 'success');
+        notify(t('Backup exported as JSON'), 'success');
       } catch {
-        notify('Could not export the backup. Please try again.', 'error');
+        notify(t('Could not export the backup. Please try again.'), 'error');
       }
     })();
   }, [languages, decks, cards, studyStats, activity, notes, smartDecks, sessions, notify]);
@@ -1601,7 +1606,7 @@ export default function App() {
       `Interrupted ${kind === 'quiz' ? 'quiz' : 'flashcard'} session found (${count} ${count === 1 ? 'item' : 'items'})`,
       'info',
       {
-        label: 'Resume',
+        label: t('Resume'),
         onAction: () => {
           clearAllResumeSessions();
           if (validQuiz) {
@@ -1765,18 +1770,18 @@ export default function App() {
 
   const deckNameFor = useCallback(
     (deckId: string) =>
-      decks.find((d) => d.id === deckId)?.name ?? 'Vocabulary',
+      decks.find((d) => d.id === deckId)?.name ?? t('Vocabulary'),
     [decks]
   );
 
   const handleStartSmartReview = useCallback(() => {
     if (languageCards.length === 0) {
-      notify('No words available for review', 'info');
+      notify(t('No words available for review'), 'info');
       return;
     }
     const { pool, mode } = getSmartReviewCards(languageCards);
     if (pool.length === 0) {
-      notify('No cards due for review', 'info');
+      notify(t('No cards due for review'), 'info');
       return;
     }
 
@@ -1848,7 +1853,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] dark:bg-[#121110]">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 mx-auto border-4 border-[#B45309] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">Loading Noor Language Studio...</p>
+          <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">{t('Loading Noor Language Studio...')}</p>
         </div>
       </div>
     );
@@ -1871,15 +1876,15 @@ export default function App() {
                 alt=""
                 className="w-7 h-7 rounded-lg object-cover shrink-0"
               />
-              Noor Language Studio
+              {t('Noor Language Studio')}
             </button>
 
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={toggleSfxMute}
-                aria-label={sfxMuted ? 'Unmute sound effects' : 'Mute sound effects'}
-                title={sfxMuted ? 'Sound effects muted' : 'Sound effects on'}
+                aria-label={sfxMuted ? t('Unmute sound effects') : t('Mute sound effects')}
+                title={sfxMuted ? t('Sound effects muted') : t('Sound effects on')}
                 className={`p-2 rounded-lg border transition-colors shrink-0 ${
                   sfxMuted
                     ? 'bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20'
@@ -1896,8 +1901,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleTtsMute}
-                aria-label={ttsMuted ? 'Enable pronunciation audio' : 'Disable pronunciation audio'}
-                title={ttsMuted ? 'Pronunciation audio off' : 'Pronunciation audio on'}
+                aria-label={ttsMuted ? t('Enable pronunciation audio') : t('Disable pronunciation audio')}
+                title={ttsMuted ? t('Pronunciation audio off') : t('Pronunciation audio on')}
                 className={`p-2 rounded-lg border transition-colors shrink-0 ${
                   ttsMuted
                     ? 'bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20'
@@ -1914,7 +1919,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShortcutsOpen(true)}
-                aria-label="Keyboard shortcuts"
+                aria-label={t('Keyboard shortcuts')}
                 title="Keyboard shortcuts (?)"
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
@@ -1924,8 +1929,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                aria-label="Settings"
-                title="Settings"
+                aria-label={t('Settings')}
+                title={t('Settings')}
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 <Settings2 className="w-4 h-4" />
@@ -1936,10 +1941,10 @@ export default function App() {
                 onClick={toggleTheme}
                 aria-label={
                   theme === 'light'
-                    ? 'Switch to dark mode'
+                    ? t('Switch to dark mode')
                     : theme === 'dark'
-                      ? 'Switch to system theme'
-                      : 'Switch to light mode'
+                      ? t('Switch to system theme')
+                      : t('Switch to light mode')
                 }
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
@@ -1960,7 +1965,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(true)}
-                aria-label="Open navigation"
+                aria-label={t('Open navigation')}
                 className="lg:hidden p-2 -ml-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
               >
                 <Menu className="w-5 h-5" />
@@ -1968,8 +1973,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed((v) => !v)}
-                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-label={sidebarCollapsed ? t('Expand sidebar') : t('Collapse sidebar')}
+                title={sidebarCollapsed ? t('Expand sidebar') : t('Collapse sidebar')}
                 className="hidden lg:inline-flex p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
               >
                 <PanelLeft className="w-4 h-4" />
@@ -1995,7 +2000,7 @@ export default function App() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] hover:border-[#B45309] text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] transition-colors whitespace-nowrap shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Words</span>
+                <span>{t('Add Words')}</span>
               </button>
 
               <button
@@ -2007,14 +2012,14 @@ export default function App() {
                 }}
                 className="px-4 py-1.5 sm:py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
               >
-                Start Quiz
+                {t('Start Quiz')}
               </button>
 
               <button
                 type="button"
                 onClick={toggleSfxMute}
-                aria-label={sfxMuted ? 'Unmute sound effects' : 'Mute sound effects'}
-                title={sfxMuted ? 'Sound effects muted' : 'Sound effects on'}
+                aria-label={sfxMuted ? t('Unmute sound effects') : t('Mute sound effects')}
+                title={sfxMuted ? t('Sound effects muted') : t('Sound effects on')}
                 className={`p-2 rounded-lg transition-colors shrink-0 ${
                   sfxMuted
                     ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
@@ -2031,8 +2036,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleTtsMute}
-                aria-label={ttsMuted ? 'Enable pronunciation audio' : 'Disable pronunciation audio'}
-                title={ttsMuted ? 'Pronunciation audio off' : 'Pronunciation audio on'}
+                aria-label={ttsMuted ? t('Enable pronunciation audio') : t('Disable pronunciation audio')}
+                title={ttsMuted ? t('Pronunciation audio off') : t('Pronunciation audio on')}
                 className={`p-2 rounded-lg transition-colors shrink-0 ${
                   ttsMuted
                     ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10'
@@ -2049,12 +2054,12 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}
-                aria-label="Command palette"
+                aria-label={t('Command palette')}
                 title="Command palette (Ctrl+K)"
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors text-xs font-medium"
               >
                 <Search className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Search</span>
+                <span className="hidden sm:inline">{t('Search')}</span>
                 <kbd className="hidden md:inline font-mono text-[10px] px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E] text-[#78716C] dark:text-[#A8A29E]">
                   ⌘K
                 </kbd>
@@ -2063,7 +2068,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShortcutsOpen(true)}
-                aria-label="Keyboard shortcuts"
+                aria-label={t('Keyboard shortcuts')}
                 title="Keyboard shortcuts (?)"
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
@@ -2073,8 +2078,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                aria-label="Settings"
-                title="Settings"
+                aria-label={t('Settings')}
+                title={t('Settings')}
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 <Settings2 className="w-4 h-4" />
@@ -2083,7 +2088,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                aria-label={theme === 'light' ? t('Switch to dark mode') : t('Switch to light mode')}
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
                 {theme === 'light' ? (
@@ -2186,12 +2191,12 @@ export default function App() {
                           onClick={handleStartDueReview}
                           className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-colors"
                         >
-                          Review Now
+                          {t('Review Now')}
                         </button>
                         <button
                           type="button"
                           onClick={() => setDueBannerDismissedFor(getLocalDateString())}
-                          aria-label="Dismiss due review reminder"
+                          aria-label={t('Dismiss due review reminder')}
                           className="p-1.5 rounded-lg text-amber-700/70 dark:text-amber-400/70 hover:text-amber-900 dark:hover:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -2439,6 +2444,10 @@ export default function App() {
           handleEnterLanguage(languageId);
           setSettingsOpen(false);
         }}
+        uiLanguage={appPrefs.uiLanguage ?? 'en'}
+        onUiLanguageChange={(lang) =>
+          setAppPrefs((prev) => ({ ...prev, uiLanguage: lang }))
+        }
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

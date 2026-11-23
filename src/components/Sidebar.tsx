@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { WorkspaceView } from '../types';
+import { t } from '../i18n';
 
 interface SidebarProps {
   view: WorkspaceView;
@@ -31,10 +32,10 @@ const NAV_ITEMS: Array<{
   label: string;
   icon: LucideIcon;
 }> = [
-  { id: 'words', label: 'Words', icon: BookOpen },
-  { id: 'quiz', label: 'Quiz', icon: Brain },
-  { id: 'stats', label: 'Statistics', icon: BarChart3 },
-  { id: 'notes', label: 'Notes', icon: NotebookPen },
+  { id: 'words', label: t('Words'), icon: BookOpen },
+  { id: 'quiz', label: t('Quiz'), icon: Brain },
+  { id: 'stats', label: t('Statistics'), icon: BarChart3 },
+  { id: 'notes', label: t('Notes'), icon: NotebookPen },
 ];
 
 export function Sidebar({
@@ -67,7 +68,7 @@ export function Sidebar({
           {(!collapsed || mobile) && (
             <div className="min-w-0">
               <div className="font-display text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC] truncate leading-tight">
-                Noor Studio
+                {t('Noor Studio')}
               </div>
               <button
                 type="button"
@@ -75,7 +76,7 @@ export function Sidebar({
                   onOpenLanguages();
                   onCloseMobile?.();
                 }}
-                title="Switch language"
+                title={t('Switch language')}
                 className="text-[11px] text-[#78716C] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] truncate block max-w-full transition-colors"
               >
                 {languageName} · Languages
@@ -94,8 +95,8 @@ export function Sidebar({
               key={id}
               type="button"
               onClick={() => navigate(id)}
-              title={collapsed && !mobile ? label : undefined}
-              aria-label={label}
+              title={collapsed && !mobile ? t(label) : undefined}
+              aria-label={t(label)}
               aria-current={active ? 'page' : undefined}
               className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out ${
                 collapsed && !mobile ? 'justify-center px-0' : ''
@@ -120,7 +121,7 @@ export function Sidebar({
                   </span>
                 )}
               </span>
-              {(!collapsed || mobile) && <span className="truncate">{label}</span>}
+              {(!collapsed || mobile) && <span className="truncate">{t(label)}</span>}
             </button>
           );
         })}
@@ -134,13 +135,13 @@ export function Sidebar({
             onOpenLanguages();
             onCloseMobile?.();
           }}
-          title={collapsed && !mobile ? 'Languages' : undefined}
+          title={collapsed && !mobile ? t('Languages') : undefined}
           className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-all duration-200 ease-out ${
             collapsed && !mobile ? 'justify-center px-0' : ''
           }`}
         >
           <Languages className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
-          {(!collapsed || mobile) && <span>Languages</span>}
+          {(!collapsed || mobile) && <span>{t('Languages')}</span>}
         </button>
         {mobile ? (
           <button
@@ -149,14 +150,14 @@ export function Sidebar({
             className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-all duration-200 ease-out"
           >
             <X className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:scale-110" />
-            <span>Close</span>
+            <span>{t('Close')}</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')}
+            title={collapsed ? t('Expand sidebar') : t('Collapse sidebar')}
             className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#78716C] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-all duration-200 ease-out ${
               collapsed ? 'justify-center px-0' : ''
             }`}
@@ -166,7 +167,7 @@ export function Sidebar({
             ) : (
               <>
                 <PanelLeftClose className="w-[18px] h-[18px] shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
-                <span>Collapse</span>
+                <span>{t('Collapse')}</span>
               </>
             )}
           </button>

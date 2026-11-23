@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SessionMode } from '../types';
 import { SPEAKING_PRACTICE_ENABLED } from './QuizSetupModal';
+import { t } from '../i18n';
 
 interface QuizLauncherProps {
   hasCards: boolean;
@@ -30,13 +31,13 @@ const MODE_CARDS: Array<{
   description: string;
   icon: typeof Layers;
 }> = [
-  { mode: 'flashcards', label: 'Flashcards', description: 'Flip through cards and self-grade', icon: Layers },
-  { mode: 'multiple-choice', label: 'Multiple Choice', description: 'Pick the correct translation', icon: ListChecks },
-  { mode: 'true-false', label: 'True / False', description: 'Judge if the pair matches', icon: ToggleLeft },
-  { mode: 'listening', label: 'Listening', description: 'Hear the word, choose the meaning', icon: Headphones },
-  { mode: 'typing', label: 'Typing', description: 'Type the translation from memory', icon: Keyboard },
-  { mode: 'fill-blank', label: 'Fill in the Blank', description: 'Complete the example sentence', icon: PenLine },
-  { mode: 'speaking', label: 'Speaking', description: 'Say the word out loud', icon: Mic },
+  { mode: 'flashcards', label: t('Flashcards'), description: t('Flip through cards and self-grade'), icon: Layers },
+  { mode: 'multiple-choice', label: t('Multiple Choice'), description: t('Pick the correct translation'), icon: ListChecks },
+  { mode: 'true-false', label: t('True / False'), description: t('Judge if the pair matches'), icon: ToggleLeft },
+  { mode: 'listening', label: t('Listening'), description: t('Hear the word, choose the meaning'), icon: Headphones },
+  { mode: 'typing', label: t('Typing'), description: t('Type the translation from memory'), icon: Keyboard },
+  { mode: 'fill-blank', label: t('Fill in the Blank'), description: t('Complete the example sentence'), icon: PenLine },
+  { mode: 'speaking', label: t('Speaking'), description: t('Say the word out loud'), icon: Mic },
 ];
 
 export function QuizLauncher({
@@ -55,10 +56,10 @@ export function QuizLauncher({
       <section className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-            Guided Sessions
+            {t('Guided Sessions')}
           </h3>
           <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-            Let the scheduler pick your next cards
+            {t('Let the scheduler pick your next cards')}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -70,10 +71,10 @@ export function QuizLauncher({
           >
             <div className="flex items-center gap-2 text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
               <Zap className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B]" />
-              Smart Review
+              {t('Smart Review')}
             </div>
             <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-1">
-              Weak words first, then what's due
+              {t('Weak words first, then what\'s due')}
             </p>
           </button>
 
@@ -93,7 +94,7 @@ export function QuizLauncher({
               )}
             </div>
             <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-1">
-              {dueCount > 0 ? 'Cards scheduled for review now' : 'Nothing due right now'}
+              {dueCount > 0 ? t('Cards scheduled for review now') : t('Nothing due right now')}
             </p>
           </button>
 
@@ -113,7 +114,7 @@ export function QuizLauncher({
               )}
             </div>
             <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] mt-1">
-              {leechCount > 0 ? 'Targeted practice for problem words' : 'No leech cards'}
+              {leechCount > 0 ? t('Targeted practice for problem words') : t('No leech cards')}
             </p>
           </button>
         </div>
@@ -123,10 +124,10 @@ export function QuizLauncher({
       <section className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 sm:p-6 space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-            Practice Modes
+            {t('Practice Modes')}
           </h3>
           <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-            Choose a format, then pick decks and question count
+            {t('Choose a format, then pick decks and question count')}
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -142,9 +143,9 @@ export function QuizLauncher({
                 disabled={disabled}
                 title={
                   isSpeakingLocked
-                    ? 'Coming soon'
+                    ? t('Coming soon')
                     : isListeningBlocked
-                      ? 'Requires a supported browser voice for this language'
+                      ? t('Requires a supported browser voice for this language')
                       : undefined
                 }
                 className="text-left px-4 py-3.5 rounded-xl border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] hover:border-[#B45309] dark:hover:border-[#D97706] hover:bg-white dark:hover:bg-[#1C1A17] hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none flex flex-col gap-2"
@@ -152,25 +153,25 @@ export function QuizLauncher({
                 <div className="flex items-center gap-2">
                   <Icon className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
                   <span className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    {label}
+                    {t(label)}
                   </span>
                   {isSpeakingLocked && (
                     <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#2E2A25] text-[#57534E] dark:text-[#A8A29E]">
-                      Soon
+                      {t('Soon')}
                     </span>
                   )}
                   {isListeningBlocked && !isSpeakingLocked && (
                     <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#2E2A25] text-[#57534E] dark:text-[#A8A29E]">
-                      No voice
+                      {t('No voice')}
                     </span>
                   )}
                 </div>
                 <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
                   {isSpeakingLocked
-                    ? 'Speech recognition practice is coming soon.'
+                    ? t('Speech recognition practice is coming soon.')
                     : isListeningBlocked
-                      ? 'Enable a compatible voice in Settings to use this mode.'
-                      : description}
+                      ? t('Enable a compatible voice in Settings to use this mode.')
+                      : t(description)}
                 </p>
               </button>
             );

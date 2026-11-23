@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal } from './Modal';
+import { t } from '../i18n';
 
 interface ShortcutsModalProps {
   open: boolean;
@@ -62,7 +63,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="font-display text-lg font-semibold leading-snug text-[#1C1917] dark:text-[#F5F2EC]">
-              Keyboard Shortcuts
+              {t('Keyboard Shortcuts')}
             </h2>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
               Press <Kbd>?</Kbd> anytime to toggle this panel.
@@ -73,36 +74,36 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
             onClick={onClose}
             className="text-xs font-medium text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
           >
-            Close
+            {t('Close')}
           </button>
         </div>
 
         <div className="space-y-6">
-          <Section title="Flashcards">
-            <ShortcutRow keys={['Space']} label="Flip card" />
+          <Section title={t('Flashcards')}>
+            <ShortcutRow keys={[t('Space')]} label={t('Flip card')} />
             <ShortcutRow keys={['←', '→']} label="Previous / next card" />
-            <ShortcutRow keys={['1']} label="Rate: Hard" />
-            <ShortcutRow keys={['2']} label="Rate: Good" />
-            <ShortcutRow keys={['3']} label="Rate: Easy" />
+            <ShortcutRow keys={['1']} label={t('Rate: Hard')} />
+            <ShortcutRow keys={['2']} label={t('Rate: Good')} />
+            <ShortcutRow keys={['3']} label={t('Rate: Easy')} />
           </Section>
 
-          <Section title="Quizzes">
-            <ShortcutRow keys={['1', '–', '4']} label="Select answer option" />
+          <Section title={t('Quizzes')}>
+            <ShortcutRow keys={['1', '–', '4']} label={t('Select answer option')} />
             <ShortcutRow keys={['T']} label="True / False: True" />
             <ShortcutRow keys={['F']} label="True / False: False" />
-            <ShortcutRow keys={['R']} label="Replay pronunciation" />
-            <ShortcutRow keys={['Enter']} label="Submit / Continue" />
-            <ShortcutRow keys={['Esc']} label="Close dialog / menu" />
+            <ShortcutRow keys={['R']} label={t('Replay pronunciation')} />
+            <ShortcutRow keys={[t('Enter')]} label="Submit / Continue" />
+            <ShortcutRow keys={[t('Esc')]} label="Close dialog / menu" />
           </Section>
 
-          <Section title="Global">
-            <ShortcutRow keys={['Ctrl', 'K']} label="Command palette (Cmd on Mac)" />
-            <ShortcutRow keys={['G', 'W']} label="Go to Words" />
-            <ShortcutRow keys={['G', 'Q']} label="Go to Quiz" />
-            <ShortcutRow keys={['G', 'S']} label="Go to Statistics" />
-            <ShortcutRow keys={['G', 'N']} label="Go to Notes" />
-            <ShortcutRow keys={['C']} label="New word" />
-            <ShortcutRow keys={['?']} label="Toggle this cheat-sheet" />
+          <Section title={t('Global')}>
+            <ShortcutRow keys={[t('Ctrl'), 'K']} label="Command palette (Cmd on Mac)" />
+            <ShortcutRow keys={['G', 'W']} label={t('Go to Words')} />
+            <ShortcutRow keys={['G', 'Q']} label={t('Go to Quiz')} />
+            <ShortcutRow keys={['G', 'S']} label={t('Go to Statistics')} />
+            <ShortcutRow keys={['G', 'N']} label={t('Go to Notes')} />
+            <ShortcutRow keys={['C']} label={t('New word')} />
+            <ShortcutRow keys={['?']} label={t('Toggle this cheat-sheet')} />
           </Section>
         </div>
       </div>

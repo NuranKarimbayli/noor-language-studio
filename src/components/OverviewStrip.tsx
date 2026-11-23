@@ -3,6 +3,7 @@ import { CalendarClock, Flame, RefreshCw, Shuffle, Zap } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getReviewForecast, isCardDue, isWeakCard } from '../utils/srs';
+import { t } from '../i18n';
 
 interface OverviewStripProps {
   languageId: string;
@@ -13,14 +14,14 @@ interface OverviewStripProps {
 }
 
 const DAILY_QUOTES: Array<{ text: string; author?: string }> = [
-  { text: 'Every new word is a new window to the world.' },
-  { text: 'To have another language is to possess a second soul.', author: 'Charlemagne' },
-  { text: 'Small daily practice turns unfamiliar sounds into fluent thought.' },
-  { text: 'Language is the road map of a culture.', author: 'Rita Mae Brown' },
-  { text: 'Ten quiet minutes a day outweighs an occasional marathon.' },
-  { text: 'Mistakes are proof that you are actively recalling, not passively reading.' },
-  { text: 'A different language is a different vision of life.', author: 'Federico Fellini' },
-  { text: 'Fluency grows one recalled word at a time.' },
+  { text: t('Every new word is a new window to the world.') },
+  { text: t('To have another language is to possess a second soul.'), author: t('Charlemagne') },
+  { text: t('Small daily practice turns unfamiliar sounds into fluent thought.') },
+  { text: t('Language is the road map of a culture.'), author: t('Rita Mae Brown') },
+  { text: t('Ten quiet minutes a day outweighs an occasional marathon.') },
+  { text: t('Mistakes are proof that you are actively recalling, not passively reading.') },
+  { text: t('A different language is a different vision of life.'), author: t('Federico Fellini') },
+  { text: t('Fluency grows one recalled word at a time.') },
 ];
 
 function getDayOfYear(): number {
@@ -70,7 +71,7 @@ export function OverviewStrip({
     const card = sorted[idx];
     return {
       card,
-      deckName: deckNameMap.get(card.deckId) ?? 'Vocabulary',
+      deckName: deckNameMap.get(card.deckId) ?? t('Vocabulary'),
     };
   }, [cards, languageId, wordOffset, deckNameMap]);
 
@@ -110,7 +111,7 @@ export function OverviewStrip({
           {/* Daily Motivation Quote */}
           <div className="flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl bg-[#F3EFE8]/70 dark:bg-[#171513] border border-slate-200 dark:border-[#2E2A25]">
             <p className="text-xs sm:text-sm italic text-[#57534E] dark:text-[#C4BEB4] leading-relaxed">
-              “{quote.text}”
+              “{t(quote.text)}”
               {quote.author && (
                 <span className="not-italic text-[#78716C] dark:text-[#A8A29E] ml-2">
                   — {quote.author}
@@ -120,8 +121,8 @@ export function OverviewStrip({
             <button
               type="button"
               onClick={() => setQuoteOffset((n) => n + 1)}
-              aria-label="Next motivation quote"
-              title="Another quote"
+              aria-label={t('Next motivation quote')}
+              title={t('Another quote')}
               className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white/70 dark:hover:bg-[#25221E] transition-colors shrink-0"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -132,11 +133,11 @@ export function OverviewStrip({
           <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25]">
             <div className="space-y-0.5 min-w-0">
               <div className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                {weakCount > 0 ? 'Weak Words Need Review' : 'Leitner Smart Review'}
+                {weakCount > 0 ? t('Weak Words Need Review') : t('Leitner Smart Review')}
               </div>
               <p className="text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
                 {cards.length === 0
-                  ? 'Add vocabulary words to unlock adaptive review.'
+                  ? t('Add vocabulary words to unlock adaptive review.')
                   : weakCount > 0
                     ? `${weakCount} ${weakCount === 1 ? 'word' : 'words'} marked hard or missed recently`
                     : `${dueCount} ${dueCount === 1 ? 'word' : 'words'} ready in your spaced queue`}
@@ -150,7 +151,7 @@ export function OverviewStrip({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FAF8F5] dark:bg-[#25221E] border border-[#B45309]/40 dark:border-[#D97706]/50 hover:bg-[#B45309] hover:text-white dark:hover:bg-[#D97706] dark:hover:text-[#121110] hover:-translate-y-px hover:shadow-md text-xs sm:text-sm font-semibold text-[#B45309] dark:text-[#F59E0B] transition-all duration-200 ease-out whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
             >
               <Zap className="w-3.5 h-3.5" />
-              <span>{weakCount > 0 ? `Weak Words (${weakCount})` : 'Smart Review'}</span>
+              <span>{weakCount > 0 ? `Weak Words (${weakCount})` : t('Smart Review')}</span>
             </button>
           </div>
         </div>
@@ -159,14 +160,14 @@ export function OverviewStrip({
         <div className="md:col-span-5 bg-gradient-to-br from-white to-[#FAF6EE] dark:from-[#1C1A17] dark:to-[#181512] border border-[#B45309]/25 dark:border-[#D97706]/30 rounded-2xl p-5 flex flex-col justify-between gap-3 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#B45309]/50 dark:hover:border-[#D97706]/50">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-[#B45309] dark:text-[#F59E0B]">
-              Word of the Day
+              {t('Word of the Day')}
             </span>
             {cards.length > 1 && (
               <button
                 type="button"
                 onClick={() => setWordOffset((n) => n + 1)}
-                aria-label="Show another spotlight word"
-                title="Cycle spotlight word"
+                aria-label={t('Show another spotlight word')}
+                title={t('Cycle spotlight word')}
                 className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-white/70 dark:hover:bg-[#25221E] transition-colors"
               >
                 <Shuffle className="w-3.5 h-3.5" />
@@ -195,12 +196,12 @@ export function OverviewStrip({
             </div>
           ) : (
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-              Add words to highlight one daily spotlight entry.
+              {t('Add words to highlight one daily spotlight entry.')}
             </p>
           )}
 
           <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
-            {wordOfTheDay ? wordOfTheDay.deckName : 'Daily Spotlight'}
+            {wordOfTheDay ? wordOfTheDay.deckName : t('Daily Spotlight')}
           </div>
         </div>
       </div>
@@ -210,7 +211,7 @@ export function OverviewStrip({
         {/* Card 1: Total Words */}
         <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
-            Total Words
+            {t('Total Words')}
           </span>
           <div className="font-mono text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
             {cards.length}
@@ -224,7 +225,7 @@ export function OverviewStrip({
         <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
-              Mastery
+              {t('Mastery')}
             </span>
             <span className="font-mono text-xs font-medium text-[#B45309] dark:text-[#F59E0B] tabular-nums">
               {masteryPct}%
@@ -257,14 +258,14 @@ export function OverviewStrip({
           <div className="font-mono text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] tabular-nums">
             {stats.streakDays}{' '}
             <span className="text-sm font-sans font-normal text-[#78716C] dark:text-[#A8A29E]">
-              {stats.streakDays === 1 ? 'Day' : 'Days'}
+              {stats.streakDays === 1 ? t('Day') : t('Days')}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-xs text-[#57534E] dark:text-[#A8A29E] tabular-nums">
             <span>
               {accuracyPct !== null
                 ? `${accuracyPct}% quiz accuracy · ${stats.totalQuizAnswered} answered`
-                : 'No quizzes completed yet'}
+                : t('No quizzes completed yet')}
             </span>
             {(stats.bestQuizStreak ?? 0) > 0 && (
               <span className="inline-flex items-center gap-1 text-orange-700 dark:text-orange-400 font-medium whitespace-nowrap">
@@ -279,7 +280,7 @@ export function OverviewStrip({
         <div className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-5 flex flex-col justify-between gap-2 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-[#D97706]/50 dark:hover:border-[#D97706]/40">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
-              Review Forecast
+              {t('Review Forecast')}
             </span>
             <CalendarClock className="w-3.5 h-3.5 text-[#B45309] dark:text-[#F59E0B]" />
           </div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Deck, Note, VocabCard } from '../types';
 import { Modal } from './Modal';
+import { t } from '../i18n';
 
 export type PaletteActionId =
   | 'new-deck'
@@ -47,12 +48,12 @@ const ACTIONS: Array<{
   icon: typeof Zap;
   keywords: string;
 }> = [
-  { id: 'smart-review', label: 'Start Smart Review', hint: 'Due & weak cards first', icon: Sparkles, keywords: 'study quiz review srs' },
-  { id: 'due-review', label: 'Review Due Cards', hint: 'Everything due today', icon: Zap, keywords: 'study quiz due today' },
-  { id: 'add-words', label: 'Add Words', hint: 'New vocabulary entry', icon: Plus, keywords: 'new card word vocabulary' },
-  { id: 'new-deck', label: 'New Deck', hint: 'Create a vocabulary deck', icon: Layers, keywords: 'create deck folder' },
-  { id: 'new-note', label: 'New Note', hint: 'Blacknotes sheet', icon: NotebookPen, keywords: 'notebook write note' },
-  { id: 'export-backup', label: 'Export Backup', hint: 'Download full JSON backup', icon: Download, keywords: 'backup export json save data' },
+  { id: 'smart-review', label: t('Start Smart Review'), hint: t('Due & weak cards first'), icon: Sparkles, keywords: 'study quiz review srs' },
+  { id: 'due-review', label: t('Review Due Cards'), hint: t('Everything due today'), icon: Zap, keywords: 'study quiz due today' },
+  { id: 'add-words', label: t('Add Words'), hint: t('New vocabulary entry'), icon: Plus, keywords: 'new card word vocabulary' },
+  { id: 'new-deck', label: t('New Deck'), hint: t('Create a vocabulary deck'), icon: Layers, keywords: 'create deck folder' },
+  { id: 'new-note', label: t('New Note'), hint: t('Blacknotes sheet'), icon: NotebookPen, keywords: 'notebook write note' },
+  { id: 'export-backup', label: t('Export Backup'), hint: t('Download full JSON backup'), icon: Download, keywords: 'backup export json save data' },
 ];
 
 /** Subsequence fuzzy match — returns a score (lower = better) or null. */
@@ -105,7 +106,7 @@ function buildItems(
     if (s !== null) {
       scored.push({
         score: s,
-        item: { kind: 'deck', id: d.id, label: d.name, hint: 'Deck', deck: d },
+        item: { kind: 'deck', id: d.id, label: d.name, hint: t('Deck'), deck: d },
       });
     }
   }
@@ -132,7 +133,7 @@ function buildItems(
   }
 
   for (const n of notes) {
-    const title = n.title?.trim() || 'Untitled note';
+    const title = n.title?.trim() || t('Untitled note');
     const s = Math.min(
       fuzzyScore(query, title) ?? Infinity,
       fuzzyScore(query, n.content.slice(0, 200)) ?? Infinity
@@ -140,7 +141,7 @@ function buildItems(
     if (s !== null) {
       scored.push({
         score: s + 0.5,
-        item: { kind: 'note', id: n.id, label: title, hint: 'Note', note: n },
+        item: { kind: 'note', id: n.id, label: title, hint: t('Note'), note: n },
       });
     }
   }
@@ -209,7 +210,7 @@ export function CommandPalette({
   }, [activeIndex]);
 
   const sectionOf = (item: PaletteItem) =>
-    item.kind === 'action' ? 'Actions' : item.kind === 'deck' ? 'Decks' : item.kind === 'card' ? 'Words' : 'Notes';
+    item.kind === 'action' ? t('Actions') : item.kind === 'deck' ? t('Decks') : item.kind === 'card' ? t('Words') : t('Notes');
 
   let lastSection = '';
 
@@ -223,8 +224,8 @@ export function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search decks, words, notes, or actions…"
-            aria-label="Command palette search"
+            placeholder={t('Search decks, words, notes, or actions…')}
+            aria-label={t('Command palette search')}
             role="combobox"
             aria-expanded="true"
             aria-controls="command-palette-list"
@@ -283,11 +284,11 @@ export function CommandPalette({
                   <Icon className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] truncate">
-                      {item.label}
+                      {t(item.label)}
                     </span>
                     {item.hint && (
                       <span className="block text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
-                        {item.hint}
+                        {t(item.hint)}
                       </span>
                     )}
                   </span>

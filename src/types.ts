@@ -145,6 +145,7 @@ export interface AppPrefs {
   notesAutoSave?: boolean; // auto-save the notepad while typing (default true)
   notesAutoSaveSeconds?: number; // debounce interval for auto-save (1|2|5|10)
   lastBackupAt?: string; // ISO timestamp of the last full-backup export
+  uiLanguage?: 'en' | 'ru'; // interface language (independent of study language)
 }
 
 // Freeform study notes ("note sheets"), persisted in IndexedDB and included

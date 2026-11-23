@@ -3,6 +3,7 @@ import { Bug, CalendarClock, Flame, History, Minus, Plus, Target, TrendingUp } f
 import { ActivityDay, MasterySnapshot, SessionMode, SessionRecord, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getDailyForecast, isLeechCard } from '../utils/srs';
+import { t } from '../i18n';
 
 interface ActivitySectionProps {
   activity: ActivityDay[];
@@ -25,13 +26,13 @@ const GOAL_MAX = 200;
 const MISTAKE_BANK_SIZE = 10;
 
 const SESSION_MODE_LABELS: Record<SessionMode, string> = {
-  flashcards: 'Flashcards',
-  'true-false': 'True/False',
-  'multiple-choice': 'Quiz',
-  listening: 'Listening',
-  typing: 'Typing',
-  'fill-blank': 'Fill Blank',
-  speaking: 'Speaking',
+  flashcards: t('Flashcards'),
+  'true-false': t('True/False'),
+  'multiple-choice': t('Quiz'),
+  listening: t('Listening'),
+  typing: t('Typing'),
+  'fill-blank': t('Fill Blank'),
+  speaking: t('Speaking'),
 };
 
 function formatSessionTime(iso: string): string {
@@ -83,7 +84,7 @@ function AccuracySparkline({ sessions }: { sessions: SessionRecord[] }) {
       viewBox={`0 0 ${W} ${H}`}
       className="w-full h-14"
       role="img"
-      aria-label="Quiz accuracy trend over recent sessions"
+      aria-label={t('Quiz accuracy trend over recent sessions')}
       preserveAspectRatio="none"
     >
       <polygon points={area} className="fill-[#B45309]/10 dark:fill-[#D97706]/10" />
@@ -139,8 +140,8 @@ interface HeatCell {
 }
 
 const MONTH_LABELS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  t('Jan'), t('Feb'), t('Mar'), t('Apr'), t('May'), t('Jun'),
+  t('Jul'), t('Aug'), t('Sep'), t('Oct'), t('Nov'), t('Dec'),
 ] as const;
 
 function parseHeatDate(dateStr: string): Date {
@@ -211,7 +212,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
       const cd = parseHeatDate(c.date);
       return cd.getDate() === 1;
     });
-    if (hasMonthStart) return MONTH_LABELS[d.getMonth()];
+    if (hasMonthStart) return t(MONTH_LABELS[d.getMonth()]);
     return null;
   });
 
@@ -219,7 +220,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
   const anyLabel = monthLabels.some(Boolean);
   if (!anyLabel && weeks.length > 0) {
     const first = weeks[0].find((c) => c !== null);
-    if (first) monthLabels[0] = MONTH_LABELS[parseHeatDate(first.date).getMonth()];
+    if (first) monthLabels[0] = t(MONTH_LABELS[parseHeatDate(first.date).getMonth()]);
   }
 
   return (
@@ -251,7 +252,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
                 aria-label={`${formatHeatDate(cell.date)}: ${
                   cell.value > 0
                     ? `${cell.reviews} ${cell.reviews === 1 ? 'review' : 'reviews'}${cell.quizzes > 0 ? `, ${cell.quizzes} ${cell.quizzes === 1 ? 'quiz' : 'quizzes'}` : ''}${cell.added > 0 ? `, ${cell.added} new ${cell.added === 1 ? 'word' : 'words'}` : ''}`
-                    : 'No practice recorded'
+                    : t('No practice recorded')
                 }`}
                 onMouseEnter={(e) => showTooltipFor(cell, e.currentTarget, setTip)}
                 onMouseLeave={() => setTip(null)}
@@ -293,7 +294,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
                   {tip.cell.added > 0 && ` · ${tip.cell.added} new ${tip.cell.added === 1 ? 'word' : 'words'}`}
                 </>
               ) : (
-                'No practice recorded'
+                t('No practice recorded')
               )}
             </div>
           </div>
@@ -388,9 +389,9 @@ export function ActivitySection({
       d.setDate(d.getDate() + i);
       labels.push(
         i === 0
-          ? 'Today'
+          ? t('Today')
           : i === 1
-            ? 'Tmrw'
+            ? t('Tmrw')
             : d.toLocaleDateString(undefined, { weekday: 'short' })
       );
     }
@@ -448,14 +449,14 @@ export function ActivitySection({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              Activity
+              {t('Activity')}
             </h3>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
               Words reviewed over the last {HEATMAP_WEEKS} weeks
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
-            <span>Less</span>
+            <span>{t('Less')}</span>
             {LEVEL_CLASSES.map((cls, i) => (
               <span
                 key={i}
@@ -463,7 +464,7 @@ export function ActivitySection({
                 aria-hidden="true"
               />
             ))}
-            <span>More</span>
+            <span>{t('More')}</span>
           </div>
         </div>
 
@@ -475,7 +476,7 @@ export function ActivitySection({
             <div className="flex items-center gap-2 min-w-0">
               <Target className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
               <span className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
-                Daily Review Goal
+                {t('Daily Review Goal')}
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -487,7 +488,7 @@ export function ActivitySection({
                   type="button"
                   onClick={() => adjustGoal(-GOAL_STEP)}
                   disabled={dailyGoal <= GOAL_MIN}
-                  aria-label="Decrease daily goal"
+                  aria-label={t('Decrease daily goal')}
                   className="px-1.5 py-1 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] disabled:opacity-40 transition-colors"
                 >
                   <Minus className="w-3 h-3" />
@@ -496,7 +497,7 @@ export function ActivitySection({
                   type="button"
                   onClick={() => adjustGoal(GOAL_STEP)}
                   disabled={dailyGoal >= GOAL_MAX}
-                  aria-label="Increase daily goal"
+                  aria-label={t('Increase daily goal')}
                   className="px-1.5 py-1 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] disabled:opacity-40 transition-colors border-l border-slate-200 dark:border-[#2E2A25]"
                 >
                   <Plus className="w-3 h-3" />
@@ -514,7 +515,7 @@ export function ActivitySection({
           </div>
           <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E]">
             {goalReached
-              ? 'Daily goal reached — nicely done.'
+              ? t('Daily goal reached — nicely done.')
               : `${dailyGoal - todayReviews} more ${dailyGoal - todayReviews === 1 ? 'word' : 'words'} to hit today's goal.`}
             {todayAdded > 0 && (
               <span className="text-emerald-700 dark:text-emerald-400">
@@ -538,7 +539,7 @@ export function ActivitySection({
           <div className="flex items-center gap-2">
             <CalendarClock className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
             <span className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
-              Upcoming Reviews
+              {t('Upcoming Reviews')}
             </span>
           </div>
           <div className="grid grid-cols-7 gap-1.5">
@@ -575,7 +576,7 @@ export function ActivitySection({
                 onClick={onExportBackup}
                 className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-300 transition-colors"
               >
-                Export now
+                {t('Export now')}
               </button>
             </p>
           )}
@@ -587,10 +588,10 @@ export function ActivitySection({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              Weakness Radar
+              {t('Weakness Radar')}
             </h3>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-              Most frequently missed words
+              {t('Most frequently missed words')}
             </p>
           </div>
           <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
@@ -600,7 +601,7 @@ export function ActivitySection({
           <div className="flex-1 flex flex-col items-center justify-center text-center py-6 gap-2">
             <TrendingUp className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-              No missed words yet. Keep practicing!
+              {t('No missed words yet. Keep practicing!')}
             </p>
           </div>
         ) : (
@@ -659,10 +660,10 @@ export function ActivitySection({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              Mastery Trend
+              {t('Mastery Trend')}
             </h3>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-              Share of words at Leitner box 4+ — captured weekly
+              {t('Share of words at Leitner box 4+ — captured weekly')}
             </p>
           </div>
           <TrendingUp className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />
@@ -697,10 +698,10 @@ export function ActivitySection({
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-            Session History
+            {t('Session History')}
           </h3>
           <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-            Completed study sessions and accuracy trend
+            {t('Completed study sessions and accuracy trend')}
           </p>
         </div>
         <History className="w-4 h-4 text-[#78716C] dark:text-[#A8A29E] shrink-0" />
@@ -719,7 +720,7 @@ export function ActivitySection({
             </div>
             <AccuracySparkline sessions={sessions} />
             <div className="flex items-center justify-between text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
-              <span>Older</span>
+              <span>{t('Older')}</span>
               <span>
                 {(() => {
                   const recent = sessions.slice(0, Math.min(sessions.length, 10));
@@ -731,7 +732,7 @@ export function ActivitySection({
                   return `${Math.round(avg * 100)}% avg`;
                 })()}
               </span>
-              <span>Recent</span>
+              <span>{t('Recent')}</span>
             </div>
           </div>
 
@@ -745,13 +746,13 @@ export function ActivitySection({
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] truncate">
-                      {SESSION_MODE_LABELS[s.mode] ?? s.mode}
+                      {t(SESSION_MODE_LABELS[s.mode] ?? s.mode)}
                     </div>
                     <div className="text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
                       {s.deckNames.length > 0
                         ? s.deckNames.slice(0, 2).join(', ') +
                           (s.deckNames.length > 2 ? ` +${s.deckNames.length - 2}` : '')
-                        : 'All decks'}
+                        : t('All decks')}
                       {' · '}
                       {formatSessionTime(s.completedAt)}
                     </div>
@@ -783,8 +784,8 @@ export function ActivitySection({
       {perDeckAccuracy.length > 0 && (
         <div className="pt-4 border-t border-slate-200 dark:border-[#2E2A25] space-y-2.5">
           <div className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
-            Accuracy by deck
-            <span className="font-normal"> — single-deck sessions</span>
+            {t('Accuracy by deck')}
+            <span className="font-normal">{t('— single-deck sessions')}</span>
           </div>
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
             {perDeckAccuracy.map((d) => (

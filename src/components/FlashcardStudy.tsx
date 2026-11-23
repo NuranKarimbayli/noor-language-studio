@@ -35,6 +35,7 @@ import {
   useBrowserVoices,
   VoiceSelection,
 } from '../utils/speechUtils';
+import { t } from '../i18n';
 
 interface FlashcardStudyProps {
   decks: Deck[];
@@ -201,7 +202,7 @@ export function FlashcardStudy({
 
     const items: StudyItem[] = pool.map((card, index) => ({
       card,
-      deckName: deckMap.get(card.deckId)?.name ?? 'Vocabulary Deck',
+      deckName: deckMap.get(card.deckId)?.name ?? t('Vocabulary Deck'),
       promptSide: promptSideFor(index),
     }));
 
@@ -224,7 +225,7 @@ export function FlashcardStudy({
       if (!card || card.suspended) continue;
       items.push({
         card,
-        deckName: deckMap.get(card.deckId)?.name ?? 'Vocabulary Deck',
+        deckName: deckMap.get(card.deckId)?.name ?? t('Vocabulary Deck'),
         promptSide: promptSideFor(items.length),
       });
     }
@@ -511,7 +512,7 @@ export function FlashcardStudy({
             className="inline-flex items-center gap-1.5 text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Decks</span>
+            <span>{t('Back to Decks')}</span>
           </button>
 
           {onlyHardMode && (
@@ -520,7 +521,7 @@ export function FlashcardStudy({
               onClick={() => restartSession(false)}
               className="text-xs font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
             >
-              Hard cards only · Show all
+              {t('Hard cards only · Show all')}
             </button>
           )}
         </div>
@@ -528,14 +529,14 @@ export function FlashcardStudy({
         <div className="flex flex-wrap items-center gap-2.5">
           <div
             role="group"
-            aria-label="Card queue order"
+            aria-label={t('Card queue order')}
             className="flex items-center gap-1 p-1 bg-[#F3EFE8] dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-lg"
           >
             {(
               [
-                { id: 'smart', label: 'Smart' },
-                { id: 'sequential', label: 'Order' },
-                { id: 'shuffled', label: 'Shuffle' },
+                { id: 'smart', label: t('Smart') },
+                { id: 'sequential', label: t('Order') },
+                { id: 'shuffled', label: t('Shuffle') },
               ] as Array<{ id: QueueOrder; label: string }>
             ).map((opt) => (
               <button
@@ -548,7 +549,7 @@ export function FlashcardStudy({
                     : 'text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
                 }`}
               >
-                {opt.label}
+                {t(opt.label)}
               </button>
             ))}
           </div>
@@ -559,7 +560,7 @@ export function FlashcardStudy({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Mode</span>
+            <span>{t('Mode')}</span>
           </button>
         </div>
       </section>
@@ -569,12 +570,12 @@ export function FlashcardStudy({
         <div className="max-w-xl mx-auto py-16 px-6 text-center bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl">
           <BookOpen className="w-10 h-10 mx-auto text-[#78716C] dark:text-[#A8A29E] mb-4" />
           <h2 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] mb-2">
-            {onlyHardMode ? 'No cards marked Hard' : 'No flashcards in this selection'}
+            {onlyHardMode ? t('No cards marked Hard') : t('No flashcards in this selection')}
           </h2>
           <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mb-6">
             {onlyHardMode
-              ? 'Great work — none of the selected cards are currently marked Hard.'
-              : 'Add vocabulary entries before starting a flashcard session.'}
+              ? t('Great work — none of the selected cards are currently marked Hard.')
+              : t('Add vocabulary entries before starting a flashcard session.')}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             {onlyHardMode ? (
@@ -583,7 +584,7 @@ export function FlashcardStudy({
                 onClick={() => restartSession(false)}
                 className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
               >
-                Study All Cards
+                {t('Study All Cards')}
               </button>
             ) : (
               <button
@@ -591,7 +592,7 @@ export function FlashcardStudy({
                 onClick={onBackToWorkspace}
                 className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
               >
-                Back to Decks
+                {t('Back to Decks')}
               </button>
             )}
           </div>
@@ -607,7 +608,7 @@ export function FlashcardStudy({
           <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-700 dark:text-emerald-400 relative z-10" />
           <div className="space-y-2 relative z-10">
             <h2 className="font-display text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              Session Complete
+              {t('Session Complete')}
             </h2>
             <p className="text-sm text-[#57534E] dark:text-[#A8A29E]">
               You reviewed {studyQueue.length} {studyQueue.length === 1 ? 'card' : 'cards'} and updated your Leitner spacing schedule.
@@ -615,7 +616,7 @@ export function FlashcardStudy({
             {sessionConfig.leechLab && (
               <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                 {remainingLeeches === 0
-                  ? 'All leech cards in this session graduated — great work.'
+                  ? t('All leech cards in this session graduated — great work.')
                   : `${remainingLeeches} ${remainingLeeches === 1 ? 'leech card' : 'leech cards'} still need${remainingLeeches === 1 ? 's' : ''} work. Run Leech Lab again to continue.`}
               </p>
             )}
@@ -626,19 +627,19 @@ export function FlashcardStudy({
               <div className="font-mono text-2xl font-semibold text-red-700 dark:text-red-400">
                 {sessionRatings.hard}
               </div>
-              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">Hard</div>
+              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">{t('Hard')}</div>
             </div>
             <div className="py-2">
               <div className="font-mono text-2xl font-semibold text-[#B45309] dark:text-[#F59E0B]">
                 {sessionRatings.good}
               </div>
-              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">Good</div>
+              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">{t('Good')}</div>
             </div>
             <div className="py-2">
               <div className="font-mono text-2xl font-semibold text-emerald-700 dark:text-emerald-400">
                 {sessionRatings.easy}
               </div>
-              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">Easy</div>
+              <div className="text-xs text-[#57534E] dark:text-[#A8A29E]">{t('Easy')}</div>
             </div>
           </div>
 
@@ -650,7 +651,7 @@ export function FlashcardStudy({
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
               >
                 <RotateCcw className="w-4 h-4" />
-                Practice Hard Cards
+                {t('Practice Hard Cards')}
               </button>
             )}
             <button
@@ -659,14 +660,14 @@ export function FlashcardStudy({
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1C1917] hover:bg-[#292524] dark:bg-[#F5F2EC] dark:hover:bg-[#E6E1D8] text-white dark:text-[#121110] text-sm font-medium transition-colors"
             >
               <Shuffle className="w-4 h-4" />
-              Restart Cards
+              {t('Restart Cards')}
             </button>
             <button
               type="button"
               onClick={onOpenSetup}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
             >
-              Try Another Mode
+              {t('Try Another Mode')}
             </button>
           </div>
         </motion.div>
@@ -703,8 +704,8 @@ export function FlashcardStudy({
                 tabIndex={0}
                 aria-label={
                   isFlipped
-                    ? 'Flashcard answer side. Click or press Space to flip back'
-                    : 'Flashcard prompt side. Click or press Space to reveal answer'
+                    ? t('Flashcard answer side. Click or press Space to flip back')
+                    : t('Flashcard prompt side. Click or press Space to reveal answer')
                 }
                 onClick={() => setIsFlipped((f) => !f)}
                 onKeyDown={(e) => {
@@ -757,7 +758,7 @@ export function FlashcardStudy({
                   <div className="text-center text-xs text-[#78716C] dark:text-[#A8A29E]">
                     Click card or press{' '}
                     <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E] text-[#1C1917] dark:text-[#F5F2EC]">
-                      Space
+                      {t('Space')}
                     </kbd>{' '}
                     to flip
                   </div>
@@ -767,7 +768,7 @@ export function FlashcardStudy({
                 <div className="absolute inset-0 backface-hidden rotate-y-180 bg-[#FAF8F5] dark:bg-[#1E1B18] border border-slate-200 dark:border-[#2E2A25] rounded-2xl p-6 sm:p-10 flex flex-col justify-between shadow-sm transition-shadow duration-300 hover:shadow-md">
                   <div className="flex items-center justify-between text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
                     <span>
-                      {currentItem.promptSide === 'word' ? 'Translation' : 'Word'}
+                      {currentItem.promptSide === 'word' ? t('Translation') : t('Word')}
                     </span>
                     <span className="font-mono tabular-nums">
                       Box {liveCard.srsBox ?? 1}/5
@@ -801,7 +802,7 @@ export function FlashcardStudy({
 
                     {currentItem.card.mnemonic && (
                       <p className="text-xs sm:text-sm text-[#B45309] dark:text-[#F59E0B] max-w-lg mx-auto pt-3">
-                        <span className="font-medium">Memory tip:</span>{' '}
+                        <span className="font-medium">{t('Memory tip:')}</span>{' '}
                         {currentItem.card.mnemonic}
                       </p>
                     )}
@@ -830,7 +831,7 @@ export function FlashcardStudy({
                   className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Prev
+                  {t('Prev')}
                 </button>
                 <button
                   type="button"
@@ -838,7 +839,7 @@ export function FlashcardStudy({
                   onClick={() => goToIndex(currentIndex + 1)}
                   className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
-                  Skip
+                  {t('Skip')}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -859,7 +860,7 @@ export function FlashcardStudy({
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-red-300 dark:border-red-900/70 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/70 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     <RotateCcw className="w-4 h-4 shrink-0" />
-                    <span>Hard</span>
+                    <span>{t('Hard')}</span>
                     <span className="font-mono text-xs opacity-70">1</span>
                   </button>
                   <button
@@ -868,7 +869,7 @@ export function FlashcardStudy({
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-amber-300 dark:border-amber-800/70 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/70 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     <Check className="w-4 h-4 shrink-0" />
-                    <span>Good</span>
+                    <span>{t('Good')}</span>
                     <span className="font-mono text-xs opacity-70">2</span>
                   </button>
                   <button
@@ -877,7 +878,7 @@ export function FlashcardStudy({
                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-800/70 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/70 text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>Easy</span>
+                    <span>{t('Easy')}</span>
                     <span className="font-mono text-xs opacity-70">3</span>
                   </button>
                 </div>

@@ -5,6 +5,7 @@ import {
   useBrowserVoices,
   VoiceSelection,
 } from '../utils/speechUtils';
+import { t } from '../i18n';
 
 interface SpeakButtonProps {
   text: string;
@@ -40,8 +41,8 @@ export function SpeakButton({
     return (
       <span
         role="img"
-        aria-label="Voice not supported for this language"
-        title="Voice not supported for this language"
+        aria-label={t('Voice not supported for this language')}
+        title={t('Voice not supported for this language')}
         className={`inline-flex items-center justify-center p-1.5 rounded-lg text-[#C9C2B8] dark:text-[#4A453E] cursor-not-allowed ${className}`}
       >
         <Volume2 className={`${iconClassName} opacity-50`} />
@@ -53,7 +54,7 @@ export function SpeakButton({
     <button
       type="button"
       aria-label={label ?? `Pronounce: ${text}`}
-      title="Pronounce"
+      title={t('Pronounce')}
       onClick={(e) => {
         e.stopPropagation();
         speakText(text, langCode, voice);

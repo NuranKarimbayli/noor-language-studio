@@ -11,6 +11,7 @@ import {
 } from '../utils/speechUtils';
 import { parseBackupJson } from '../utils/storage';
 import { Modal } from './Modal';
+import { t } from '../i18n';
 
 interface LanguageScreenProps {
   languages: LanguageItem[];
@@ -95,7 +96,7 @@ export function LanguageScreen({
       } catch (err) {
         setImportState({
           status: 'error',
-          message: err instanceof Error ? err.message : 'Could not read this backup file.',
+          message: err instanceof Error ? err.message : t('Could not read this backup file.'),
         });
       }
     };
@@ -111,7 +112,7 @@ export function LanguageScreen({
     } catch (err) {
       setImportState({
         status: 'error',
-        message: err instanceof Error ? err.message : 'Restore failed.',
+        message: err instanceof Error ? err.message : t('Restore failed.'),
       });
     } finally {
       setImporting(false);
@@ -285,10 +286,10 @@ export function LanguageScreen({
       <div className="space-y-4">
         <div className="space-y-1.5">
           <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#1C1917] dark:text-[#F5F2EC]">
-            Select a Language
+            {t('Select a Language')}
           </h1>
           <p className="text-sm sm:text-base text-[#57534E] dark:text-[#A8A29E]">
-            Open a language workspace or add a custom language to start building decks.
+            {t('Open a language workspace or add a custom language to start building decks.')}
           </p>
         </div>
       </div>
@@ -335,7 +336,7 @@ export function LanguageScreen({
                       await onUpdateLanguage(lang.id, { pinned: !lang.pinned });
                     }}
                     aria-label={lang.pinned ? `Unpin ${lang.name}` : `Pin ${lang.name}`}
-                    title={lang.pinned ? 'Unpin language' : 'Pin to top'}
+                    title={lang.pinned ? t('Unpin language') : t('Pin to top')}
                     className={`p-1.5 rounded-md transition-colors ${
                       lang.pinned
                         ? 'text-[#B45309] dark:text-[#F59E0B] hover:bg-amber-50 dark:hover:bg-amber-950/30'
@@ -391,15 +392,15 @@ export function LanguageScreen({
                   {lang.voiceDisabled ? (
                     <span className="inline-flex items-center gap-1 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
                       <MicOff className="w-3 h-3" />
-                      Voice off
+                      {t('Voice off')}
                     </span>
                   ) : !supported ? (
                     <span
                       className="inline-flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400"
-                      title="No native browser voice found for this language — pronunciation is disabled"
+                      title={t('No native browser voice found for this language — pronunciation is disabled')}
                     >
                       <Volume2 className="w-3 h-3" />
-                      No browser voice
+                      {t('No browser voice')}
                     </span>
                   ) : lang.voiceName ? (
                     <span
@@ -407,7 +408,7 @@ export function LanguageScreen({
                       title={`Using voice: ${lang.voiceName}`}
                     >
                       <Volume2 className="w-3 h-3" />
-                      Voice set
+                      {t('Voice set')}
                     </span>
                   ) : null}
                 </div>
@@ -428,10 +429,10 @@ export function LanguageScreen({
 
           <div className="pt-5 space-y-1">
             <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              + Custom Language
+              {t('+ Custom Language')}
             </h2>
             <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
-              Add French, Japanese, Italian, or any language you want to study.
+              {t('Add French, Japanese, Italian, or any language you want to study.')}
             </p>
           </div>
         </button>
@@ -462,7 +463,7 @@ export function LanguageScreen({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EC] text-white dark:text-[#121110] text-xs font-semibold hover:opacity-90 transition-opacity"
             >
               <Download className="w-3.5 h-3.5" />
-              Export All Data
+              {t('Export All Data')}
             </button>
             <button
               type="button"
@@ -470,7 +471,7 @@ export function LanguageScreen({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-xs font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] dark:hover:border-[#D97706] transition-colors"
             >
               <Upload className="w-3.5 h-3.5" />
-              Restore Backup
+              {t('Restore Backup')}
             </button>
             <input
               ref={backupFileRef}
@@ -490,13 +491,13 @@ export function LanguageScreen({
           setModalOpen(false);
           setEditingId(null);
         }}
-        ariaLabel={editingId ? 'Edit Language' : 'Add Custom Language'}
+        ariaLabel={editingId ? t('Edit Language') : t('Add Custom Language')}
         panelClassName="max-w-md p-6"
       >
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                 <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                  {editingId ? 'Edit Language' : 'Add Custom Language'}
+                  {editingId ? t('Edit Language') : t('Add Custom Language')}
                 </h2>
                 <button
                   type="button"
@@ -504,7 +505,7 @@ export function LanguageScreen({
                     setModalOpen(false);
                     setEditingId(null);
                   }}
-                  aria-label="Close modal"
+                  aria-label={t('Close modal')}
                   className="p-1.5 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
                 >
                   <X className="w-4 h-4" />
@@ -513,7 +514,7 @@ export function LanguageScreen({
 
               <div>
                 <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                  Language Name
+                  {t('Language Name')}
                 </label>
                 <input
                   type="text"
@@ -521,7 +522,7 @@ export function LanguageScreen({
                   autoFocus
                   value={customName}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g., Japanese, French, Azerbaijani"
+                  placeholder={t('e.g., Japanese, French, Azerbaijani')}
                   className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                 />
               </div>
@@ -529,7 +530,7 @@ export function LanguageScreen({
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
                   <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                    Code Badge
+                    {t('Code Badge')}
                   </label>
                   <input
                     type="text"
@@ -551,7 +552,7 @@ export function LanguageScreen({
                     type="text"
                     value={customNative}
                     onChange={(e) => setCustomNative(e.target.value)}
-                    placeholder="e.g., 日本語, Français"
+                    placeholder={t('e.g., 日本語, Français')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -559,7 +560,7 @@ export function LanguageScreen({
 
               <div>
                 <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                  Pronunciation Voice
+                  {t('Pronunciation Voice')}
                 </label>
                 <div className="flex items-stretch gap-2">
                   <select
@@ -570,7 +571,7 @@ export function LanguageScreen({
                     }}
                     className="flex-1 min-w-0 px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   >
-                  <option value="auto">Auto-detect best match</option>
+                  <option value="auto">{t('Auto-detect best match')}</option>
                   <option value="none">None / Disable Voice</option>
                   {voiceGroups.map(([tag, voices]) => (
                     <optgroup
@@ -599,7 +600,7 @@ export function LanguageScreen({
                     onClick={() => {
                       stopSpeaking();
                       const sample =
-                        customNative.trim() || customName.trim() || 'Hello';
+                        customNative.trim() || customName.trim() || t('Hello');
                       speakText(
                         sample,
                         effectiveCode() || 'EN',
@@ -610,11 +611,11 @@ export function LanguageScreen({
                             : { disabled: true }
                       );
                     }}
-                    aria-label="Preview selected voice"
+                    aria-label={t('Preview selected voice')}
                     title={
                       customVoice === 'none'
-                        ? 'Voice is disabled'
-                        : 'Preview voice'
+                        ? t('Voice is disabled')
+                        : t('Preview voice')
                     }
                     className="shrink-0 inline-flex items-center justify-center w-10 rounded-lg border border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] hover:border-[#B45309]/50 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                   >
@@ -623,12 +624,12 @@ export function LanguageScreen({
                 </div>
                 <p className="mt-1.5 text-[11px] text-[#78716C] dark:text-[#A8A29E] leading-relaxed">
                   {customVoice === 'none'
-                    ? 'Pronunciation will be disabled for this language.'
+                    ? t('Pronunciation will be disabled for this language.')
                     : customVoice === 'auto'
                       ? matchedNativeVoice
                         ? `Auto-match found: ${matchedNativeVoice.name} (${matchedNativeVoice.lang})`
                         : browserVoices.length === 0
-                          ? 'Loading available voices…'
+                          ? t('Loading available voices…')
                           : `No native browser voice found for ${effectiveCode() || 'this language'} — pronunciation will be unavailable.`
                       : selectedVoiceInfo
                         ? `Selected: ${selectedVoiceInfo.name} (${selectedVoiceInfo.lang})`
@@ -645,14 +646,14 @@ export function LanguageScreen({
                   }}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={!customName.trim()}
                   className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40"
                 >
-                  {editingId ? 'Save Changes' : 'Add Language'}
+                  {editingId ? t('Save Changes') : t('Add Language')}
                 </button>
               </div>
             </form>
@@ -685,7 +686,7 @@ export function LanguageScreen({
                 onClick={() => setConfirmDelete(null)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
               <button
                 type="button"
@@ -696,7 +697,7 @@ export function LanguageScreen({
                 }}
                 className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
               >
-                Delete Language
+                {t('Delete Language')}
               </button>
             </div>
           </>
@@ -714,7 +715,7 @@ export function LanguageScreen({
           <>
             <div className="space-y-1.5">
               <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                Invalid Backup File
+                {t('Invalid Backup File')}
               </h2>
               <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
                 {importState.message}
@@ -726,7 +727,7 @@ export function LanguageScreen({
                 onClick={() => setImportState(null)}
                 className="px-4 py-2 rounded-lg bg-[#1C1917] dark:bg-[#F5F2EC] text-white dark:text-[#121110] text-sm font-medium"
               >
-                Close
+                {t('Close')}
               </button>
             </div>
           </>
@@ -735,7 +736,7 @@ export function LanguageScreen({
             <div className="space-y-1.5">
               <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC] flex items-center gap-2">
                 <FileUp className="w-5 h-5 text-[#B45309] dark:text-[#F59E0B]" />
-                Restore Backup
+                {t('Restore Backup')}
               </h2>
               <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
                 This backup contains{' '}
@@ -743,7 +744,7 @@ export function LanguageScreen({
                   {importState.counts.languages} languages, {importState.counts.decks}{' '}
                   decks, and {importState.counts.cards} words
                 </span>
-                , plus study stats and activity.
+                {t(', plus study stats and activity.')}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2.5 pt-1">
@@ -754,7 +755,7 @@ export function LanguageScreen({
                 className="w-full text-left px-4 py-3 rounded-xl border border-slate-200 dark:border-[#2E2A25] hover:border-[#B45309] dark:hover:border-[#D97706] bg-[#FAF8F5] dark:bg-[#121110] transition-colors disabled:opacity-50"
               >
                 <span className="block text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                  Merge into current data
+                  {t('Merge into current data')}
                 </span>
                 <span className="block text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5 leading-relaxed">
                   Add backup records alongside existing ones. Matching IDs are
@@ -768,7 +769,7 @@ export function LanguageScreen({
                 className="w-full text-left px-4 py-3 rounded-xl border border-red-200 dark:border-red-900/60 hover:border-red-400 bg-red-50/60 dark:bg-red-950/20 transition-colors disabled:opacity-50"
               >
                 <span className="block text-sm font-semibold text-red-800 dark:text-red-300">
-                  Replace all current data
+                  {t('Replace all current data')}
                 </span>
                 <span className="block text-xs text-red-700/80 dark:text-red-300/70 mt-0.5 leading-relaxed">
                   Permanently clear this workspace, then restore the backup.
@@ -783,7 +784,7 @@ export function LanguageScreen({
                 onClick={() => setImportState(null)}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
               >
-                Cancel
+                {t('Cancel')}
               </button>
             </div>
           </>

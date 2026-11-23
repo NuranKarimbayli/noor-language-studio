@@ -28,6 +28,7 @@ import { DiacriticBar } from './DiacriticBar';
 import { Modal } from './Modal';
 import { SpeakButton } from './SpeakButton';
 import { VoiceSelection } from '../utils/speechUtils';
+import { t } from '../i18n';
 
 interface DeckWorkspaceProps {
   languageName: string;
@@ -121,19 +122,19 @@ type ModalState =
   | { type: 'delete-smart-deck'; smartDeck: SmartDeck };
 
 const CONFIDENCE_FILTERS: Array<{ value: 'all' | ConfidenceLevel; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'new', label: 'New' },
-  { value: 'hard', label: 'Hard' },
-  { value: 'good', label: 'Good' },
-  { value: 'easy', label: 'Easy' },
+  { value: 'all', label: t('All') },
+  { value: 'new', label: t('New') },
+  { value: 'hard', label: t('Hard') },
+  { value: 'good', label: t('Good') },
+  { value: 'easy', label: t('Easy') },
 ];
 
 const SMART_FILTER_OPTIONS: Array<{ key: keyof SmartDeckFilter; label: string; hint: string }> = [
-  { key: 'weak', label: 'Weak words', hint: 'Hard-rated or low Leitner box' },
-  { key: 'due', label: 'Due for review', hint: 'Scheduled review is due now' },
-  { key: 'leeches', label: 'Leeches', hint: 'Repeatedly missed cards' },
-  { key: 'newOnly', label: 'New cards', hint: 'Never reviewed yet' },
-  { key: 'hardOnly', label: 'Hard-rated', hint: 'Self-rated Hard' },
+  { key: 'weak', label: t('Weak words'), hint: t('Hard-rated or low Leitner box') },
+  { key: 'due', label: t('Due for review'), hint: t('Scheduled review is due now') },
+  { key: 'leeches', label: t('Leeches'), hint: t('Repeatedly missed cards') },
+  { key: 'newOnly', label: t('New cards'), hint: t('Never reviewed yet') },
+  { key: 'hardOnly', label: t('Hard-rated'), hint: t('Self-rated Hard') },
 ];
 
 function smartFilterSummary(filter: SmartDeckFilter): string {
@@ -143,9 +144,9 @@ function smartFilterSummary(filter: SmartDeckFilter): string {
 }
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyLevel; label: string }> = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'hard', label: 'Hard' },
+  { value: 'easy', label: t('Easy') },
+  { value: 'medium', label: t('Medium') },
+  { value: 'hard', label: t('Hard') },
 ];
 
 export function DeckWorkspace({
@@ -430,7 +431,7 @@ export function DeckWorkspace({
       await onBulkUpdateCards([...selectedCardIds], { deckId });
       exitSelectionMode();
     } catch {
-      onNotify('Could not move the words. Please try again.', 'error');
+      onNotify(t('Could not move the words. Please try again.'), 'error');
     }
   };
 
@@ -440,7 +441,7 @@ export function DeckWorkspace({
       await onBulkUpdateCards([...selectedCardIds], { difficulty });
       exitSelectionMode();
     } catch {
-      onNotify('Could not update difficulty. Please try again.', 'error');
+      onNotify(t('Could not update difficulty. Please try again.'), 'error');
     }
   };
 
@@ -450,7 +451,7 @@ export function DeckWorkspace({
       await onBulkDeleteCards([...selectedCardIds]);
       exitSelectionMode();
     } catch {
-      onNotify('Could not delete the words. Please try again.', 'error');
+      onNotify(t('Could not delete the words. Please try again.'), 'error');
     }
   };
 
@@ -586,7 +587,7 @@ export function DeckWorkspace({
       }
       setModal({ type: 'none' });
     } catch {
-      onNotify('Could not save the deck. Please try again.', 'error');
+      onNotify(t('Could not save the deck. Please try again.'), 'error');
     }
   };
 
@@ -634,7 +635,7 @@ export function DeckWorkspace({
       }
       setModal({ type: 'none' });
     } catch {
-      onNotify('Could not save the word. Please try again.', 'error');
+      onNotify(t('Could not save the word. Please try again.'), 'error');
     }
   };
 
@@ -650,7 +651,7 @@ export function DeckWorkspace({
       );
       setModal({ type: 'none' });
     } catch {
-      onNotify('Could not import the words. Please try again.', 'error');
+      onNotify(t('Could not import the words. Please try again.'), 'error');
     }
   };
 
@@ -708,7 +709,7 @@ export function DeckWorkspace({
       setModal({ type: 'none' });
     } catch (err) {
       setJsonError(
-        err instanceof Error ? err.message : 'Could not import the deck. Please try again.'
+        err instanceof Error ? err.message : t('Could not import the deck. Please try again.')
       );
     }
   };
@@ -733,7 +734,7 @@ export function DeckWorkspace({
       SMART_FILTER_OPTIONS.some((o) => smartDeckFilter[o.key]) ||
       Boolean(smartDeckFilter.tag?.trim());
     if (!hasFilter) {
-      onNotify('Pick at least one filter for the smart deck.', 'error');
+      onNotify(t('Pick at least one filter for the smart deck.'), 'error');
       return;
     }
     try {
@@ -747,7 +748,7 @@ export function DeckWorkspace({
       });
       setModal({ type: 'none' });
     } catch {
-      onNotify('Could not create the smart deck. Please try again.', 'error');
+      onNotify(t('Could not create the smart deck. Please try again.'), 'error');
     }
   };
 
@@ -759,7 +760,7 @@ export function DeckWorkspace({
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : '';
       if (!text.trim()) {
-        onNotify('That file appears to be empty.', 'error');
+        onNotify(t('That file appears to be empty.'), 'error');
         return;
       }
       setBulkText(text);
@@ -769,7 +770,7 @@ export function DeckWorkspace({
         'success'
       );
     };
-    reader.onerror = () => onNotify('Could not read that file.', 'error');
+    reader.onerror = () => onNotify(t('Could not read that file.'), 'error');
     reader.readAsText(file);
   };
 
@@ -779,7 +780,7 @@ export function DeckWorkspace({
   ) => (
     <div>
       <span className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-        Difficulty
+        {t('Difficulty')}
       </span>
       <div className="flex items-center gap-1.5">
         {DIFFICULTY_OPTIONS.map((opt) => {
@@ -799,7 +800,7 @@ export function DeckWorkspace({
                   : 'border-slate-200 dark:border-[#2E2A25] bg-[#FAF8F5] dark:bg-[#121110] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309]'
               }`}
             >
-              {opt.label}
+              {t(opt.label)}
             </button>
           );
         })}
@@ -834,7 +835,7 @@ export function DeckWorkspace({
               onClick={openJsonImport}
               className="text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
             >
-              Import JSON
+              {t('Import JSON')}
             </button>
             <button
               type="button"
@@ -842,7 +843,7 @@ export function DeckWorkspace({
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[#78716C] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors"
             >
               <Zap className="w-3.5 h-3.5" />
-              Smart Deck
+              {t('Smart Deck')}
             </button>
             <button
               type="button"
@@ -850,7 +851,7 @@ export function DeckWorkspace({
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
             >
               <Plus className="w-3.5 h-3.5" />
-              New Deck
+              {t('New Deck')}
             </button>
           </div>
         </div>
@@ -870,7 +871,7 @@ export function DeckWorkspace({
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Create First Deck
+                {t('Create First Deck')}
               </button>
               <button
                 type="button"
@@ -878,7 +879,7 @@ export function DeckWorkspace({
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
               >
                 <FileUp className="w-4 h-4" />
-                Import JSON
+                {t('Import JSON')}
               </button>
             </div>
           </div>
@@ -913,7 +914,7 @@ export function DeckWorkspace({
                       </h3>
                     </div>
                     <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] text-[10px] font-semibold uppercase tracking-wide">
-                      Smart
+                      {t('Smart')}
                     </span>
                   </div>
                   <p className="mt-1.5 text-[11px] text-[#78716C] dark:text-[#A8A29E] truncate">
@@ -995,7 +996,7 @@ export function DeckWorkspace({
                               className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#B45309] dark:text-[#F59E0B] font-medium hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                             >
                               <BookOpen className="w-3.5 h-3.5" />
-                              Practice Deck
+                              {t('Practice Deck')}
                             </button>
                           )}
                           <button
@@ -1007,7 +1008,7 @@ export function DeckWorkspace({
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                           >
                             <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
-                            Edit Deck
+                            {t('Edit Deck')}
                           </button>
                           <button
                             type="button"
@@ -1020,7 +1021,7 @@ export function DeckWorkspace({
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                           >
                             <FileUp className="w-3.5 h-3.5 text-[#78716C]" />
-                            Export JSON
+                            {t('Export JSON')}
                           </button>
                           <button
                             type="button"
@@ -1033,7 +1034,7 @@ export function DeckWorkspace({
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                           >
                             <FileDown className="w-3.5 h-3.5 text-[#78716C]" />
-                            Export CSV
+                            {t('Export CSV')}
                           </button>
                           <button
                             type="button"
@@ -1044,7 +1045,7 @@ export function DeckWorkspace({
                             className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Delete Deck
+                            {t('Delete Deck')}
                           </button>
                         </motion.div>
                       )}
@@ -1090,7 +1091,7 @@ export function DeckWorkspace({
                   </h1>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#B45309]/10 dark:bg-[#D97706]/15 text-[#B45309] dark:text-[#F59E0B] text-[10px] font-semibold uppercase tracking-wide">
                     <Zap className="w-3 h-3" />
-                    Smart
+                    {t('Smart')}
                   </span>
                 </div>
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-xl">
@@ -1176,7 +1177,7 @@ export function DeckWorkspace({
               <div className="relative">
                 <button
                   type="button"
-                  aria-label="Deck actions"
+                  aria-label={t('Deck actions')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setOpenDeckMenuId(null);
@@ -1209,7 +1210,7 @@ export function DeckWorkspace({
                         className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#B45309] dark:text-[#F59E0B] font-medium hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
-                        Practice This Deck
+                        {t('Practice This Deck')}
                       </button>
                     )}
                     <button
@@ -1221,7 +1222,7 @@ export function DeckWorkspace({
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
                       <ListPlus className="w-3.5 h-3.5 text-[#78716C]" />
-                      Bulk Import Words
+                      {t('Bulk Import Words')}
                     </button>
                     <button
                       type="button"
@@ -1232,7 +1233,7 @@ export function DeckWorkspace({
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
                       <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
-                      Edit Deck
+                      {t('Edit Deck')}
                     </button>
                     <button
                       type="button"
@@ -1244,7 +1245,7 @@ export function DeckWorkspace({
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
                       <FileUp className="w-3.5 h-3.5 text-[#78716C]" />
-                      Export JSON
+                      {t('Export JSON')}
                     </button>
                     <button
                       type="button"
@@ -1256,7 +1257,7 @@ export function DeckWorkspace({
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                     >
                       <FileDown className="w-3.5 h-3.5 text-[#78716C]" />
-                      Export CSV
+                      {t('Export CSV')}
                     </button>
                     <div className="my-1 border-t border-slate-200 dark:border-[#2E2A25]" />
                     <button
@@ -1268,7 +1269,7 @@ export function DeckWorkspace({
                       className="w-full text-left px-3.5 py-2 flex items-center gap-2.5 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Delete Deck
+                      {t('Delete Deck')}
                     </button>
                   </motion.div>
                 )}
@@ -1288,14 +1289,14 @@ export function DeckWorkspace({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search words..."
+                    placeholder={t('Search words...')}
                     className="w-full pl-10 pr-9 py-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] placeholder:text-[#78716C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      aria-label="Clear search"
+                      aria-label={t('Clear search')}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -1310,7 +1311,7 @@ export function DeckWorkspace({
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>New Word</span>
+                  <span>{t('New Word')}</span>
                 </button>
                 )}
               </div>
@@ -1327,7 +1328,7 @@ export function DeckWorkspace({
                       : 'text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
                   }`}
                 >
-                  {selectionMode ? 'Done' : 'Select'}
+                  {selectionMode ? t('Done') : t('Select')}
                 </button>
                 {deckCards.some((c) => c.suspended) && (
                   <button
@@ -1340,12 +1341,12 @@ export function DeckWorkspace({
                     }`}
                   >
                     <Archive className="w-3 h-3" />
-                    {showArchived ? 'Hide archived' : 'Archived'}
+                    {showArchived ? t('Hide archived') : t('Archived')}
                   </button>
                 )}
                 <div
                   role="group"
-                  aria-label="Filter words by confidence"
+                  aria-label={t('Filter words by confidence')}
                   className="flex items-center gap-1 text-xs"
                 >
                 {CONFIDENCE_FILTERS.map((f) => {
@@ -1361,7 +1362,7 @@ export function DeckWorkspace({
                           : 'text-[#78716C] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]'
                       }`}
                     >
-                      {f.label}
+                      {t(f.label)}
                     </button>
                   );
                 })}
@@ -1370,10 +1371,10 @@ export function DeckWorkspace({
                   <select
                     value={tagFilter}
                     onChange={(e) => setTagFilter(e.target.value)}
-                    aria-label="Filter words by tag"
+                    aria-label={t('Filter words by tag')}
                     className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309] max-w-[140px] truncate"
                   >
-                    <option value="all">All tags</option>
+                    <option value="all">{t('All tags')}</option>
                     {availableTags.map((t) => (
                       <option key={t.toLowerCase()} value={t}>
                         #{t}
@@ -1401,9 +1402,9 @@ export function DeckWorkspace({
                       if (deckId) void runBulkMove(deckId);
                     }}
                     className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#2E2A25] text-xs text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
-                    aria-label="Move selected words to deck"
+                    aria-label={t('Move selected words to deck')}
                   >
-                    <option value="">Move to deck…</option>
+                    <option value="">{t('Move to deck…')}</option>
                     {decks
                       .filter((d) => d.id !== selectedDeck?.id)
                       .map((d) => (
@@ -1420,7 +1421,7 @@ export function DeckWorkspace({
                         onClick={() => void runBulkDifficulty(opt.value)}
                         className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#2E2A25] bg-white dark:bg-[#25221E] text-[#57534E] dark:text-[#A8A29E] hover:border-[#B45309] transition-colors capitalize"
                       >
-                        {opt.label}
+                        {t(opt.label)}
                       </button>
                     ))}
                   </div>
@@ -1430,13 +1431,13 @@ export function DeckWorkspace({
                     className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Delete
+                    {t('Delete')}
                   </button>
                 </>
               )}
               {selectedCardIds.size === 0 && (
                 <span className="text-xs text-[#78716C] dark:text-[#A8A29E]">
-                  Tap the checkboxes next to words to select them
+                  {t('Tap the checkboxes next to words to select them')}
                 </span>
               )}
             </div>
@@ -1448,13 +1449,13 @@ export function DeckWorkspace({
               <div className="py-14 px-6 text-center space-y-4">
                 <p className="font-display text-xl font-medium text-[#1C1917] dark:text-[#F5F2EC]">
                   {activeSmartDeck
-                    ? 'No words match this smart deck right now'
-                    : 'This deck has no words yet'}
+                    ? t('No words match this smart deck right now')
+                    : t('This deck has no words yet')}
                 </p>
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] max-w-md mx-auto">
                   {activeSmartDeck
-                    ? 'The filter matches no cards at the moment — it will populate automatically as cards enter the matching SRS state.'
-                    : <>Add words individually or paste a list in <code className="font-mono">word - translation</code> format.</>}
+                    ? t('The filter matches no cards at the moment — it will populate automatically as cards enter the matching SRS state.')
+                    : <>Add words individually or paste a list in <code className="font-mono">{t('word - translation')}</code> format.</>}
                 </p>
                 {!activeSmartDeck && (
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
@@ -1464,7 +1465,7 @@ export function DeckWorkspace({
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    Add Words
+                    {t('Add Words')}
                   </button>
                   <button
                     type="button"
@@ -1472,7 +1473,7 @@ export function DeckWorkspace({
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
                   >
                     <ListPlus className="w-4 h-4" />
-                    Bulk Import
+                    {t('Bulk Import')}
                   </button>
                 </div>
                 )}
@@ -1480,7 +1481,7 @@ export function DeckWorkspace({
             ) : filteredCards.length === 0 ? (
               <div className="py-12 px-6 text-center">
                 <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mb-3">
-                  No words match your current search or filter.
+                  {t('No words match your current search or filter.')}
                 </p>
                 <button
                   type="button"
@@ -1491,7 +1492,7 @@ export function DeckWorkspace({
                   }}
                   className="text-sm font-medium text-[#B45309] dark:text-[#F59E0B] hover:underline"
                 >
-                  Reset filters
+                  {t('Reset filters')}
                 </button>
               </div>
             ) : (
@@ -1525,7 +1526,7 @@ export function DeckWorkspace({
                           {card.suspended && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-200/70 dark:bg-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] text-[11px] font-semibold">
                               <Archive className="w-3 h-3" />
-                              Archived
+                              {t('Archived')}
                             </span>
                           )}
                           <SpeakButton
@@ -1565,7 +1566,7 @@ export function DeckWorkspace({
                               type="button"
                               onClick={() => onOpenLinkedNote(card.linkedNoteId!)}
                               aria-label={`Open linked note for ${card.word}`}
-                              title="Open linked notebook note"
+                              title={t('Open linked notebook note')}
                               className="p-1.5 rounded-lg text-[#B45309] dark:text-[#F59E0B] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
                             >
                               <NotebookText className="w-4 h-4" />
@@ -1574,10 +1575,10 @@ export function DeckWorkspace({
                         {isLeechCard(card) && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[11px] font-semibold"
-                            title="Leech card — repeatedly missed. Prioritize or exclude it in quiz setup."
+                            title={t('Leech card — repeatedly missed. Prioritize or exclude it in quiz setup.')}
                           >
                             <AlertCircle className="w-3 h-3" />
-                            Leech
+                            {t('Leech')}
                           </span>
                         )}
                         <span
@@ -1622,7 +1623,7 @@ export function DeckWorkspace({
                                 className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                               >
                                 <Pencil className="w-3.5 h-3.5 text-[#78716C]" />
-                                Edit
+                                {t('Edit')}
                               </button>
                               {onSendCardToNote && (
                                 <button
@@ -1634,7 +1635,7 @@ export function DeckWorkspace({
                                   className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
                                 >
                                   <NotebookPen className="w-3.5 h-3.5 text-[#78716C]" />
-                                  {card.linkedNoteId ? 'Open note' : 'Send to notebook'}
+                                  {card.linkedNoteId ? t('Open note') : t('Send to notebook')}
                                 </button>
                               )}
                               <button
@@ -1650,7 +1651,7 @@ export function DeckWorkspace({
                                       'success'
                                     );
                                   } catch {
-                                    onNotify('Could not update the card. Please try again.', 'error');
+                                    onNotify(t('Could not update the card. Please try again.'), 'error');
                                   }
                                 }}
                                 className="w-full text-left px-3 py-2 flex items-center gap-2 text-[#1C1917] dark:text-[#F5F2EC] hover:bg-[#FAF8F5] dark:hover:bg-[#25221E]"
@@ -1658,12 +1659,12 @@ export function DeckWorkspace({
                                 {card.suspended ? (
                                   <>
                                     <ArchiveRestore className="w-3.5 h-3.5 text-[#78716C]" />
-                                    Restore
+                                    {t('Restore')}
                                   </>
                                 ) : (
                                   <>
                                     <Archive className="w-3.5 h-3.5 text-[#78716C]" />
-                                    Archive
+                                    {t('Archive')}
                                   </>
                                 )}
                               </button>
@@ -1674,13 +1675,13 @@ export function DeckWorkspace({
                                   try {
                                     await onDeleteCard(card.id);
                                   } catch {
-                                    onNotify('Could not delete the word. Please try again.', 'error');
+                                    onNotify(t('Could not delete the word. Please try again.'), 'error');
                                   }
                                 }}
                                 className="w-full text-left px-3 py-2 flex items-center gap-2 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                                Delete
+                                {t('Delete')}
                               </button>
                             </motion.div>
                           )}
@@ -1705,7 +1706,7 @@ export function DeckWorkspace({
                       disabled={currentPage === 1}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                     >
-                      Previous
+                      {t('Previous')}
                     </button>
                     <span className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                       Page {currentPage} of {totalPages}
@@ -1716,7 +1717,7 @@ export function DeckWorkspace({
                       disabled={currentPage === totalPages}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                     >
-                      Next
+                      {t('Next')}
                     </button>
                   </div>
                 </div>
@@ -1737,7 +1738,7 @@ export function DeckWorkspace({
               <form onSubmit={handleDeckSubmit} className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    {modal.type === 'create-deck' ? `New ${languageName} Deck` : 'Edit Deck'}
+                    {modal.type === 'create-deck' ? `New ${languageName} Deck` : t('Edit Deck')}
                   </h2>
                   <button
                     type="button"
@@ -1750,7 +1751,7 @@ export function DeckWorkspace({
 
                 <div>
                   <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                    Deck Name
+                    {t('Deck Name')}
                   </label>
                   <input
                     type="text"
@@ -1771,7 +1772,7 @@ export function DeckWorkspace({
                     rows={2}
                     value={deckDescription}
                     onChange={(e) => setDeckDescription(e.target.value)}
-                    placeholder="Short note on what this vocabulary deck covers"
+                    placeholder={t('Short note on what this vocabulary deck covers')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -1782,13 +1783,13 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
                   >
-                    {modal.type === 'create-deck' ? 'Create Deck' : 'Save Changes'}
+                    {modal.type === 'create-deck' ? t('Create Deck') : t('Save Changes')}
                   </button>
                 </div>
               </form>
@@ -1798,7 +1799,7 @@ export function DeckWorkspace({
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    Delete Deck
+                    {t('Delete Deck')}
                   </h2>
                   <button
                     type="button"
@@ -1822,7 +1823,7 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="button"
@@ -1831,12 +1832,12 @@ export function DeckWorkspace({
                         await onDeleteDeck(modal.deck.id);
                         setModal({ type: 'none' });
                       } catch {
-                        onNotify('Could not delete the deck. Please try again.', 'error');
+                        onNotify(t('Could not delete the deck. Please try again.'), 'error');
                       }
                     }}
                     className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
                   >
-                    Delete Deck
+                    {t('Delete Deck')}
                   </button>
                 </div>
               </div>
@@ -1846,7 +1847,7 @@ export function DeckWorkspace({
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    Add Words
+                    {t('Add Words')}
                   </h2>
                   <button
                     type="button"
@@ -1868,7 +1869,7 @@ export function DeckWorkspace({
                         : 'text-[#57534E] dark:text-[#A8A29E]'
                     }`}
                   >
-                    Single Word
+                    {t('Single Word')}
                   </button>
                   <button
                     type="button"
@@ -1879,14 +1880,14 @@ export function DeckWorkspace({
                         : 'text-[#57534E] dark:text-[#A8A29E]'
                     }`}
                   >
-                    Bulk Import
+                    {t('Bulk Import')}
                   </button>
                 </div>
 
                 {!selectedDeck && (
                   <div>
                     <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                      New Deck Name
+                      {t('New Deck Name')}
                     </label>
                     <input
                       type="text"
@@ -1937,7 +1938,7 @@ export function DeckWorkspace({
                         required
                         value={cardTranslation}
                         onChange={(e) => setCardTranslation(e.target.value)}
-                        placeholder="e.g., its meaning in your language"
+                        placeholder={t('e.g., its meaning in your language')}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                     </div>
@@ -1950,7 +1951,7 @@ export function DeckWorkspace({
                         type="text"
                         value={cardExample}
                         onChange={(e) => setCardExample(e.target.value)}
-                        placeholder="e.g., Labas rytas!"
+                        placeholder={t('e.g., Labas rytas!')}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                     </div>
@@ -1963,7 +1964,7 @@ export function DeckWorkspace({
                         type="text"
                         value={cardMnemonic}
                         onChange={(e) => setCardMnemonic(e.target.value)}
-                        placeholder="e.g., Sounds like 'labas' — imagine a lab assistant"
+                        placeholder={t('e.g., Sounds like \'labas\' — imagine a lab assistant')}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                     </div>
@@ -1976,7 +1977,7 @@ export function DeckWorkspace({
                     type="text"
                     value={cardTagsInput}
                     onChange={(e) => setCardTagsInput(e.target.value)}
-                    placeholder="e.g., verbs, food, travel"
+                    placeholder={t('e.g., verbs, food, travel')}
                     list="card-tags-suggestions"
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
@@ -1986,7 +1987,7 @@ export function DeckWorkspace({
                     ))}
                   </datalist>
                   <p className="mt-1 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
-                    Comma-separated — used for filtering and smart decks.
+                    {t('Comma-separated — used for filtering and smart decks.')}
                   </p>
                 </div>
 
@@ -1998,13 +1999,13 @@ export function DeckWorkspace({
                         onClick={() => setModal({ type: 'none' })}
                         className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                       >
-                        Cancel
+                        {t('Cancel')}
                       </button>
                       <button
                         type="submit"
                         className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
                       >
-                        Add Word
+                        {t('Add Word')}
                       </button>
                     </div>
                   </form>
@@ -2070,7 +2071,7 @@ export function DeckWorkspace({
                         onClick={() => setModal({ type: 'none' })}
                         className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                       >
-                        Cancel
+                        {t('Cancel')}
                       </button>
                       <button
                         type="submit"
@@ -2089,7 +2090,7 @@ export function DeckWorkspace({
               <form onSubmit={handleSingleCardSubmit} className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    Edit Vocabulary Word
+                    {t('Edit Vocabulary Word')}
                   </h2>
                   <button
                     type="button"
@@ -2161,7 +2162,7 @@ export function DeckWorkspace({
                     type="text"
                     value={cardMnemonic}
                     onChange={(e) => setCardMnemonic(e.target.value)}
-                    placeholder="e.g., Sounds like 'labas' — imagine a lab assistant"
+                    placeholder={t('e.g., Sounds like \'labas\' — imagine a lab assistant')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -2174,7 +2175,7 @@ export function DeckWorkspace({
                     type="text"
                     value={cardTagsInput}
                     onChange={(e) => setCardTagsInput(e.target.value)}
-                    placeholder="e.g., verbs, food, travel"
+                    placeholder={t('e.g., verbs, food, travel')}
                     list="card-tags-suggestions"
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
@@ -2184,7 +2185,7 @@ export function DeckWorkspace({
                     ))}
                   </datalist>
                   <p className="mt-1 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
-                    Comma-separated — used for filtering and smart decks.
+                    {t('Comma-separated — used for filtering and smart decks.')}
                   </p>
                 </div>
 
@@ -2196,13 +2197,13 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
                   >
-                    Save Word
+                    {t('Save Word')}
                   </button>
                 </div>
               </form>
@@ -2212,7 +2213,7 @@ export function DeckWorkspace({
               <form onSubmit={handleJsonSubmit} className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    Import Deck from JSON
+                    {t('Import Deck from JSON')}
                   </h2>
                   <button
                     type="button"
@@ -2239,7 +2240,7 @@ export function DeckWorkspace({
                     onClick={() => fileInputRef.current?.click()}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] shrink-0"
                   >
-                    Choose File
+                    {t('Choose File')}
                   </button>
                 </div>
 
@@ -2267,14 +2268,14 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={!jsonText.trim()}
                     className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
                   >
-                    Import Deck
+                    {t('Import Deck')}
                   </button>
                 </div>
               </form>
@@ -2285,10 +2286,10 @@ export function DeckWorkspace({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <div>
                     <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                      New Smart Deck
+                      {t('New Smart Deck')}
                     </h2>
                     <p className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">
-                      A live view over your cards — membership updates as you study.
+                      {t('A live view over your cards — membership updates as you study.')}
                     </p>
                   </div>
                   <button
@@ -2302,7 +2303,7 @@ export function DeckWorkspace({
 
                 <div>
                   <label className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E] mb-1.5">
-                    Name
+                    {t('Name')}
                   </label>
                   <input
                     type="text"
@@ -2310,7 +2311,7 @@ export function DeckWorkspace({
                     autoFocus
                     value={smartDeckName}
                     onChange={(e) => setSmartDeckName(e.target.value)}
-                    placeholder="e.g., Words to Review, Leech Squad"
+                    placeholder={t('e.g., Words to Review, Leech Squad')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -2323,14 +2324,14 @@ export function DeckWorkspace({
                     type="text"
                     value={smartDeckDesc}
                     onChange={(e) => setSmartDeckDesc(e.target.value)}
-                    placeholder="What is this set for?"
+                    placeholder={t('What is this set for?')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <span className="block text-xs font-medium text-[#57534E] dark:text-[#A8A29E]">
-                    Include cards matching any of these
+                    {t('Include cards matching any of these')}
                   </span>
                   <div className="grid grid-cols-1 gap-1.5">
                     {SMART_FILTER_OPTIONS.map((opt) => {
@@ -2357,10 +2358,10 @@ export function DeckWorkspace({
                           />
                           <span className="min-w-0">
                             <span className="block text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC]">
-                              {opt.label}
+                              {t(opt.label)}
                             </span>
                             <span className="block text-xs text-[#78716C] dark:text-[#A8A29E]">
-                              {opt.hint}
+                              {t(opt.hint)}
                             </span>
                           </span>
                         </label>
@@ -2389,7 +2390,7 @@ export function DeckWorkspace({
                         tag: e.target.value || undefined,
                       }))
                     }
-                    placeholder="e.g., verbs — matches cards with this tag"
+                    placeholder={t('e.g., verbs — matches cards with this tag')}
                     list="smart-deck-tag-suggestions"
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
@@ -2406,14 +2407,14 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={!smartDeckName.trim() || smartPreviewCount === 0}
                     className="px-4 py-2 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
                   >
-                    Create Smart Deck
+                    {t('Create Smart Deck')}
                   </button>
                 </div>
               </form>
@@ -2423,7 +2424,7 @@ export function DeckWorkspace({
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#2E2A25]">
                   <h2 className="font-display text-xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                    Delete Smart Deck
+                    {t('Delete Smart Deck')}
                   </h2>
                   <button
                     type="button"
@@ -2447,7 +2448,7 @@ export function DeckWorkspace({
                     onClick={() => setModal({ type: 'none' })}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E]"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </button>
                   <button
                     type="button"
@@ -2459,12 +2460,12 @@ export function DeckWorkspace({
                         }
                         setModal({ type: 'none' });
                       } catch {
-                        onNotify('Could not delete the smart deck. Please try again.', 'error');
+                        onNotify(t('Could not delete the smart deck. Please try again.'), 'error');
                       }
                     }}
                     className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
                   >
-                    Delete Smart Deck
+                    {t('Delete Smart Deck')}
                   </button>
                 </div>
               </div>

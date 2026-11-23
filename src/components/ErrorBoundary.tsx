@@ -1,5 +1,6 @@
 import { Component, ReactNode } from 'react';
 import { AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { t } from '../i18n';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -23,7 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error(t('ErrorBoundary caught an error:'), error, errorInfo);
   }
 
   handleReset = () => {
@@ -55,7 +56,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
             <div className="space-y-2">
               <h1 className="font-display text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-                Something went wrong
+                {t('Something went wrong')}
               </h1>
               <p className="text-sm text-[#57534E] dark:text-[#A8A29E] leading-relaxed">
                 We encountered an unexpected error. Your saved data is safe — you can
@@ -66,7 +67,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {this.state.error && (
               <details className="text-left">
                 <summary className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E] cursor-pointer hover:text-[#1C1917] dark:hover:text-[#F5F2EC]">
-                  View error details
+                  {t('View error details')}
                 </summary>
                 <pre className="mt-2 p-3 bg-[#F3EFE8] dark:bg-[#25221E] rounded-lg text-xs text-[#57534E] dark:text-[#A8A29E] overflow-auto max-h-32">
                   {this.state.error.toString()}
@@ -81,7 +82,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
-                Try Again
+                {t('Try Again')}
               </button>
               <button
                 type="button"
@@ -89,7 +90,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Go Back
+                {t('Go Back')}
               </button>
             </div>
           </div>

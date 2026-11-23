@@ -3,6 +3,7 @@ import { CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { Deck, VocabCard } from '../types';
 import { SpeakButton } from './SpeakButton';
 import { VoiceSelection } from '../utils/speechUtils';
+import { t } from '../i18n';
 
 interface WordOfTheDayProps {
   cards: VocabCard[];
@@ -36,7 +37,7 @@ export function WordOfTheDay({
     const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
     const card = sorted[dayOfYear % sorted.length];
     const deck = decks.find((d) => d.id === card.deckId);
-    return { card, deckName: deck?.name ?? 'Deck' };
+    return { card, deckName: deck?.name ?? t('Deck') };
   }, [cards, decks]);
 
   // Reset the reveal state whenever the daily pick changes
@@ -52,13 +53,13 @@ export function WordOfTheDay({
 
   return (
     <section
-      aria-label="Word of the day"
+      aria-label={t('Word of the day')}
       className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl px-5 py-4 flex flex-wrap items-center gap-x-5 gap-y-3"
     >
       <div className="flex items-center gap-2 text-[#B45309] dark:text-[#F59E0B] shrink-0">
         <CalendarDays className="w-4 h-4" />
         <span className="text-[11px] font-semibold uppercase tracking-wider">
-          Word of the day
+          {t('Word of the day')}
         </span>
       </div>
 
@@ -90,7 +91,7 @@ export function WordOfTheDay({
             className="inline-flex items-center gap-1 text-xs font-medium text-[#78716C] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors"
           >
             <Eye className="w-3.5 h-3.5" />
-            Reveal meaning
+            {t('Reveal meaning')}
           </button>
         )}
       </div>
@@ -103,7 +104,7 @@ export function WordOfTheDay({
         <button
           type="button"
           onClick={() => setRevealed(false)}
-          aria-label="Hide meaning"
+          aria-label={t('Hide meaning')}
           className="p-1 rounded-md text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
         >
           <EyeOff className="w-3.5 h-3.5" />

@@ -46,6 +46,7 @@ import { CelebrationBurst } from './CelebrationBurst';
 import { DiacriticBar } from './DiacriticBar';
 import { SpeakButton } from './SpeakButton';
 import { saveQuizResume } from '../utils/sessionResume';
+import { t } from '../i18n';
 
 interface QuizCenterProps {
   languageCode: string;
@@ -239,7 +240,7 @@ export function QuizCenter({
 
       return pool.map((card, index) => {
         const deck = deckMap.get(card.deckId);
-        const deckName = deck?.name ?? 'Deck';
+        const deckName = deck?.name ?? t('Deck');
 
         if (config.mode === 'fill-blank') {
           const blankResult = createBlankedSentence(card.exampleSentence ?? '', card.word);
@@ -631,7 +632,7 @@ export function QuizCenter({
       const isCorrect = choice === Boolean(currentQuestion.isTrueStatement);
       const record: QuizAnswerRecord = {
         question: currentQuestion,
-        userAnswer: choice ? 'True' : 'False',
+        userAnswer: choice ? t('True') : t('False'),
         status: isCorrect ? 'exact' : 'incorrect',
         isCorrect,
       };
@@ -1199,14 +1200,14 @@ export function QuizCenter({
             className="inline-flex items-center gap-1.5 text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Decks</span>
+            <span>{t('Back to Decks')}</span>
           </button>
 
           <div className="flex items-center gap-2">
             {sessionConfig.smartReviewOnly && (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-[#B45309] dark:text-[#F59E0B] pr-1">
                 <Zap className="w-3.5 h-3.5" />
-                Smart Review
+                {t('Smart Review')}
               </span>
             )}
             <button
@@ -1215,7 +1216,7 @@ export function QuizCenter({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC]"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Change Mode</span>
+              <span>{t('Change Mode')}</span>
             </button>
           </div>
         </div>
@@ -1250,10 +1251,10 @@ export function QuizCenter({
                 {currentRecord?.status === 'timeout'
                   ? "Time's up!"
                   : currentRecord
-                    ? 'Timer paused'
+                    ? t('Timer paused')
                     : timerRatio <= 0.25
-                      ? 'Hurry!'
-                      : 'Timed round'}
+                      ? t('Hurry!')
+                      : t('Timed round')}
               </span>
             )}
           </div>
@@ -1276,7 +1277,7 @@ export function QuizCenter({
             <div className="flex items-center gap-3 px-6 sm:px-8 pt-4">
               <div
                 role="progressbar"
-                aria-label="Question time remaining"
+                aria-label={t('Question time remaining')}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(timerRatio * 100)}
@@ -1307,7 +1308,7 @@ export function QuizCenter({
               className="pointer-events-none absolute top-5 right-5 z-20 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 animate-float-up-fade"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>+1 Nice!</span>
+              <span>{t('+1 Nice!')}</span>
             </div>
           )}
 
@@ -1315,14 +1316,14 @@ export function QuizCenter({
             <div className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
               {currentQuestion.deckName} ·{' '}
               {sessionConfig.mode === 'true-false'
-                ? 'Is this translation accurate?'
+                ? t('Is this translation accurate?')
                 : sessionConfig.mode === 'fill-blank'
-                  ? 'Complete the sentence'
+                  ? t('Complete the sentence')
                   : sessionConfig.mode === 'listening'
-                    ? 'Listen and pick the meaning'
+                    ? t('Listen and pick the meaning')
                     : currentQuestion.direction === 'word-to-translation'
-                      ? 'Translate to meaning'
-                      : 'Translate to foreign word'}
+                      ? t('Translate to meaning')
+                      : t('Translate to foreign word')}
             </div>
 
             {sessionConfig.mode === 'true-false' ? (
@@ -1347,8 +1348,8 @@ export function QuizCenter({
 
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'True', value: true, keyHint: '1' },
-                    { label: 'False', value: false, keyHint: '2' },
+                    { label: t('True'), value: true, keyHint: '1' },
+                    { label: t('False'), value: false, keyHint: '2' },
                   ].map((btn) => {
                     const chosen =
                       currentRecord &&
@@ -1374,13 +1375,13 @@ export function QuizCenter({
 
                     return (
                       <button
-                        key={btn.label}
+                        key={t(btn.label)}
                         type="button"
                         disabled={Boolean(currentRecord)}
                         onClick={() => handleTrueFalseSelect(btn.value)}
                         className={`py-4 px-4 rounded-xl border text-base font-semibold flex items-center justify-center gap-2.5 transition-all duration-150 ease-out enabled:hover:shadow-md enabled:hover:-translate-y-0.5 ${style}`}
                       >
-                        <span>{btn.label}</span>
+                        <span>{t(btn.label)}</span>
                         <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-[#78716C]">
                           {btn.keyHint}
                         </span>
@@ -1405,7 +1406,7 @@ export function QuizCenter({
               <div className="py-4">
                 <div className="p-6 sm:p-8 rounded-2xl bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-center space-y-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-[#78716C] dark:text-[#A8A29E]">
-                    Say this word aloud
+                    {t('Say this word aloud')}
                   </p>
                   <p className="font-display text-2xl sm:text-3xl font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
                     {currentQuestion.promptText}
@@ -1415,11 +1416,11 @@ export function QuizCenter({
                       type="button"
                       onClick={replayPrompt}
                       disabled={Boolean(currentRecord) || ttsMuted || !voiceSupported}
-                      aria-label="Hear the word"
+                      aria-label={t('Hear the word')}
                       title={
                         voiceSupported
-                          ? 'Hear the word pronounced'
-                          : 'Voice not supported for this language'
+                          ? t('Hear the word pronounced')
+                          : t('Voice not supported for this language')
                       }
                       className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-[#25221E] border border-slate-200 dark:border-[#3A352F] text-[#57534E] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors disabled:opacity-50 disabled:pointer-events-none"
                     >
@@ -1430,7 +1431,7 @@ export function QuizCenter({
                         type="button"
                         onClick={startListening}
                         disabled={Boolean(currentRecord) || isListening}
-                        aria-label={isListening ? 'Listening…' : 'Start speaking'}
+                        aria-label={isListening ? t('Listening…') : t('Start speaking')}
                         className={`inline-flex items-center justify-center gap-2 px-5 h-12 rounded-full text-sm font-semibold transition-colors ${
                           isListening
                             ? 'bg-red-600 text-white animate-pulse'
@@ -1438,11 +1439,11 @@ export function QuizCenter({
                         } disabled:opacity-50 disabled:pointer-events-none`}
                       >
                         <Mic className="w-4 h-4" />
-                        {isListening ? 'Listening…' : currentRecord ? 'Answered' : 'Tap & Speak'}
+                        {isListening ? t('Listening…') : currentRecord ? t('Answered') : t('Tap & Speak')}
                       </button>
                     ) : (
                       <span className="text-xs text-amber-700 dark:text-amber-400">
-                        Speech recognition unavailable in this browser.
+                        {t('Speech recognition unavailable in this browser.')}
                       </span>
                     )}
                   </div>
@@ -1486,11 +1487,11 @@ export function QuizCenter({
                     type="button"
                     onClick={replayPrompt}
                     disabled={Boolean(currentRecord) || ttsMuted || !voiceSupported}
-                    aria-label="Replay pronunciation"
+                    aria-label={t('Replay pronunciation')}
                     title={
                       voiceSupported
-                        ? 'Replay pronunciation'
-                        : 'Voice not supported for this language'
+                        ? t('Replay pronunciation')
+                        : t('Voice not supported for this language')
                     }
                     className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#B45309] hover:bg-[#92400E] hover:scale-105 text-white transition-all duration-200 ease-out disabled:opacity-50 disabled:pointer-events-none"
                   >
@@ -1500,7 +1501,7 @@ export function QuizCenter({
                     <p className="text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] select-text">
                       {currentRecord
                         ? `You heard: ${currentQuestion.promptText}`
-                        : 'Listen carefully — what does this word mean?'}
+                        : t('Listen carefully — what does this word mean?')}
                     </p>
                     {!currentRecord && (
                       <p className="text-xs text-[#78716C] dark:text-[#A8A29E]">
@@ -1548,7 +1549,7 @@ export function QuizCenter({
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-[#78716C] dark:text-[#A8A29E] hover:text-[#B45309] dark:hover:text-[#F59E0B] transition-colors"
                   >
                     <Lightbulb className="w-3.5 h-3.5" />
-                    Show memory tip
+                    {t('Show memory tip')}
                   </button>
                 )}
               </div>
@@ -1612,7 +1613,7 @@ export function QuizCenter({
                     disabled={Boolean(currentRecord)}
                     value={typedAnswer}
                     onChange={(e) => setTypedAnswer(e.target.value)}
-                    placeholder="Type your answer..."
+                    placeholder={t('Type your answer...')}
                     className="flex-1 px-4 py-3 rounded-xl bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-base text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309] disabled:opacity-70"
                   />
                   {!currentRecord && (
@@ -1621,7 +1622,7 @@ export function QuizCenter({
                       disabled={!typedAnswer.trim()}
                       className="px-5 py-3 rounded-xl bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-medium transition-colors whitespace-nowrap shrink-0 disabled:opacity-40 disabled:pointer-events-none"
                     >
-                      Check Answer
+                      {t('Check Answer')}
                     </button>
                   )}
                 </div>
@@ -1655,7 +1656,7 @@ export function QuizCenter({
                     {currentRecord.status === 'exact' && (
                       <div className="space-y-0.5">
                         <span className="font-semibold text-emerald-800 dark:text-emerald-300">
-                          Correct!
+                          {t('Correct!')}
                         </span>
                         {sessionConfig.mode === 'true-false' && !currentQuestion.isTrueStatement && (
                           <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
@@ -1683,7 +1684,7 @@ export function QuizCenter({
                     {(currentRecord.status === 'incorrect' || currentRecord.status === 'timeout') && (
                       <div className="space-y-0.5">
                         <span className="font-semibold text-red-800 dark:text-red-300">
-                          {currentRecord.status === 'timeout' ? 'Time expired' : 'Incorrect'}
+                          {currentRecord.status === 'timeout' ? t('Time expired') : t('Incorrect')}
                         </span>
                         <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                           Actual answer:{' '}
@@ -1704,8 +1705,8 @@ export function QuizCenter({
                   onClick={handleNextQuestion}
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#1C1917] hover:bg-[#292524] dark:bg-[#F5F2EC] dark:hover:bg-[#E6E1D8] text-white dark:text-[#121110] text-sm font-medium transition-colors whitespace-nowrap shrink-0"
                 >
-                  {currentIdx + 1 >= questions.length ? 'View Results' : 'Next Question'}
-                  <span className="font-mono text-xs opacity-70">Enter</span>
+                  {currentIdx + 1 >= questions.length ? t('View Results') : t('Next Question')}
+                  <span className="font-mono text-xs opacity-70">{t('Enter')}</span>
                 </button>
               </div>
             )}
@@ -1726,7 +1727,7 @@ export function QuizCenter({
         className="inline-flex items-center gap-1.5 text-sm font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Back to Decks</span>
+        <span>{t('Back to Decks')}</span>
       </button>
 
       <motion.section
@@ -1740,12 +1741,12 @@ export function QuizCenter({
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-[#2E2A25]">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-              Quiz Results
+              {t('Quiz Results')}
             </h1>
             <p className="text-sm text-[#57534E] dark:text-[#A8A29E] mt-1">
               {accuracyPct >= 80
-                ? 'Strong recall across this session — intervals updated.'
-                : 'Missed words have been prioritized in your Leitner review queue.'}
+                ? t('Strong recall across this session — intervals updated.')
+                : t('Missed words have been prioritized in your Leitner review queue.')}
             </p>
           </div>
           <div className="font-mono text-4xl font-semibold text-[#B45309] dark:text-[#F59E0B] tabular-nums">
@@ -1766,20 +1767,20 @@ export function QuizCenter({
             <div className="font-mono text-2xl font-semibold text-red-700 dark:text-red-400">
               {missedRecords.length}
             </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">Missed</div>
+            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">{t('Missed')}</div>
           </div>
           <div className="p-3 rounded-xl bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25]">
             <div className="font-mono text-2xl font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
               {records.length}
             </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">Total</div>
+            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">{t('Total')}</div>
           </div>
           <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50">
             <div className="font-mono text-2xl font-semibold text-orange-700 dark:text-orange-400 inline-flex items-center justify-center gap-1">
               <Flame className="w-5 h-5" />
               {bestStreak}
             </div>
-            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">Best Streak</div>
+            <div className="text-xs text-[#57534E] dark:text-[#A8A29E] mt-0.5">{t('Best Streak')}</div>
           </div>
         </div>
 
@@ -1825,14 +1826,14 @@ export function QuizCenter({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#1C1917] hover:bg-[#292524] dark:bg-[#F5F2EC] dark:hover:bg-[#E6E1D8] text-white dark:text-[#121110] text-sm font-medium transition-colors"
           >
             <Play className="w-4 h-4" />
-            Retake Quiz
+            {t('Retake Quiz')}
           </button>
           <button
             type="button"
             onClick={onOpenSetup}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-[#2E2A25] text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] hover:border-[#B45309] transition-colors"
           >
-            New Setup
+            {t('New Setup')}
           </button>
         </div>
       </motion.section>
@@ -1840,7 +1841,7 @@ export function QuizCenter({
       <section className="bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-200 dark:border-[#2E2A25]">
           <h2 className="text-sm font-semibold text-[#1C1917] dark:text-[#F5F2EC]">
-            Answer Breakdown
+            {t('Answer Breakdown')}
           </h2>
         </div>
         <div className="divide-y divide-slate-200 dark:divide-[#2E2A25]">
