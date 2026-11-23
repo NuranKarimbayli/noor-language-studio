@@ -495,6 +495,22 @@ export function DeckWorkspace({
     };
   }, []);
 
+  // Escape closes open dropdown menus — but only when no modal layer is
+  // above them (modals handle their own Escape via the shared Modal stack).
+  useEffect(() => {
+    if (modal.type !== 'none') return;
+    if (!openDeckMenuId && !headerMenuOpen && !openCardMenuId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        setOpenDeckMenuId(null);
+        setHeaderMenuOpen(false);
+        setOpenCardMenuId(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [modal.type, openDeckMenuId, headerMenuOpen, openCardMenuId]);
+
   // Trigger "+ Add Words" modal from top navigation CTA / command palette.
   // If a modal is already open we just consume the trigger — never reset
   // an in-progress form.

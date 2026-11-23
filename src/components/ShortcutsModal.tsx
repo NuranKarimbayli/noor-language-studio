@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { X } from 'lucide-react';
 import { Modal } from './Modal';
 import { t } from '../i18n';
 
@@ -40,24 +40,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
   return (
     <Modal
       open={open}
       onClose={onClose}
       ariaLabel="Keyboard shortcuts"
-      panelClassName="max-w-md"
+      panelClassName="max-w-md [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-[#443E37]"
     >
       <div className="p-6">
         <div className="flex items-center justify-between mb-5">
@@ -72,9 +60,11 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-medium text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors"
+            aria-label={t('Close')}
+            title={t('Close')}
+            className="p-1.5 -mr-1.5 rounded-lg text-[#78716C] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:bg-[#F3EFE8] dark:hover:bg-[#25221E] transition-colors shrink-0"
           >
-            {t('Close')}
+            <X className="w-4.5 h-4.5" />
           </button>
         </div>
 

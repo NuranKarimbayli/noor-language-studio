@@ -339,3 +339,27 @@
 .noor-range:disabled {
   cursor: not-allowed;
 }
+
+/* Theme-aware thin scrollbars. Per-element [&::-webkit-scrollbar] utilities
+   still override these defaults where a component opts into custom styling. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.35) transparent;
+}
+.dark * {
+  scrollbar-color: #443e37 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: #443e37;
+}

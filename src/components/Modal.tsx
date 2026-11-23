@@ -1,5 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+
+// Stack of currently-open modals. Escape only closes the topmost layer,
+// so nested confirmations (e.g. reset statistics) dismiss before their parent.
+const openModalStack: symbol[] = [];
 
 interface ModalProps {
   open: boolean;
@@ -20,6 +24,27 @@ export function Modal({
   panelClassName = '',
   ariaLabel,
 }: ModalProps) {
+  const stackIdRef = useRef<symbol | null>(null);
+  if (!stackIdRef.current) stackIdRef.current = Symbol('modal');
+
+  useEffect(() => {
+    if (!open) return;
+    const id = stackIdRef.current!;
+    openModalStack.push(id);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (openModalStack[openModalStack.length - 1] !== id) return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      const i = openModalStack.indexOf(id);
+      if (i !== -1) openModalStack.splice(i, 1);
+    };
+  }, [open, onClose]);
+
   return (
     <AnimatePresence>
       {open && (

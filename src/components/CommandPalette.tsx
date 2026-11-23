@@ -207,19 +207,6 @@ export function CommandPalette({
     }
   };
 
-  // Global Escape closes the palette even when focus isn't in the input
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
   // Keep the active row scrolled into view
   useEffect(() => {
     const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${activeIndex}"]`);

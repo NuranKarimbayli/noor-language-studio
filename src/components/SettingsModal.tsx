@@ -154,27 +154,15 @@ export function SettingsModal({
   const [confirmText, setConfirmText] = useState('');
   const [resetting, setResetting] = useState(false);
 
+  // Escape handling lives in Modal (topmost-layer aware); the nested reset
+  // confirmation is its own Modal, so it dismisses before this one.
   useEffect(() => {
     if (!open) {
       setConfirmResetOpen(false);
       setConfirmText('');
       setResetting(false);
-      return;
     }
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (confirmResetOpen) {
-          setConfirmResetOpen(false);
-          setConfirmText('');
-        } else {
-          onClose();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose, confirmResetOpen]);
+  }, [open]);
 
   return (
     <>

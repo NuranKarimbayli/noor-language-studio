@@ -162,18 +162,6 @@ export function QuizSetupModal({
     setTimerSeconds(defaultTimerSeconds);
   }, [open, initialDeckId, initialMode, decks, defaultTimerSeconds]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
   const selectedDeckIdSet = useMemo(
     () => new Set(selectedDeckIds),
     [selectedDeckIds]
