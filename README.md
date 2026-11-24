@@ -100,3 +100,8 @@ scripts/
 ## Data & Privacy
 
 All languages, decks, cards, notes, study stats, and preferences live in **IndexedDB** on your device. Clearing browser site data will erase your progress — use **Data & Backup → Export backup** (or Settings) to keep a JSON backup. Statistics nudges you if the last backup is over 14 days old.
+
+<img width="1919" height="980" alt="Screenshot 2026-11-24 094856" src="https://github.com/user-attachments/assets/0f704dc7-dbf9-4be9-a158-ffd92162225f" />
+<img width="1919" height="979" alt="Screenshot 2026-11-24 094155" src="https://github.com/user-attachments/assets/d60a0fef-66dd-432f-83ee-e98cf4229da6" />
+<img width="1919" height="978" alt="Screenshot 2026-11-24 090257" src="https://github.com/user-attachments/assets/446ffb3e-9985-46f4-820a-793489bc33d3" />
+<img width="1919" height="981" alt="Screenshot 2026-11-24 090235" src="https://github.com/user-attachments/assets/6c22189d-fd1e-4eab-85f7-64b8367648ed" />
