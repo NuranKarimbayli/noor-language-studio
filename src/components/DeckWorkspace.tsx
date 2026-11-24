@@ -517,7 +517,9 @@ export function DeckWorkspace({
   useEffect(() => {
     if (addWordsTrigger <= 0) return;
     onConsumeAddWords();
-    if (modal.type !== 'none') return;
+    // Guard on modalState (not `modal`, which keeps the closing modal during
+    // its exit animation) so a click right after closing still opens.
+    if (modalState.type !== 'none') return;
     setCardWord('');
     setCardTranslation('');
     setCardExample('');
@@ -535,7 +537,7 @@ export function DeckWorkspace({
   useEffect(() => {
     if (createDeckTrigger <= 0) return;
     onConsumeCreateDeck?.();
-    if (modal.type !== 'none') return;
+    if (modalState.type !== 'none') return;
     openCreateDeck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createDeckTrigger]);
@@ -1971,7 +1973,7 @@ export function DeckWorkspace({
                         type="text"
                         value={cardExample}
                         onChange={(e) => setCardExample(e.target.value)}
-                        placeholder={t('e.g., Labas rytas!')}
+                        placeholder={t('e.g., Hello there!')}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                     </div>
@@ -1984,7 +1986,7 @@ export function DeckWorkspace({
                         type="text"
                         value={cardMnemonic}
                         onChange={(e) => setCardMnemonic(e.target.value)}
-                        placeholder={t('e.g., Sounds like \'labas\' — imagine a lab assistant')}
+                        placeholder={t('e.g., Break it into sounds and picture the meaning')}
                         className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                       />
                     </div>
@@ -2060,7 +2062,7 @@ export function DeckWorkspace({
                       autoFocus
                       value={bulkText}
                       onChange={(e) => setBulkText(e.target.value)}
-                      placeholder={`labas - salam | Labas rytas!\načiū - təşəkkür edirəm | Labai ačiū!\nvanduo - su`}
+                      placeholder={`hello - greeting | Hello there!\nthank you - gratitude | Thank you very much!\nwater - drink`}
                       className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm font-mono text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                     />
 
@@ -2178,7 +2180,7 @@ export function DeckWorkspace({
                     type="text"
                     value={cardMnemonic}
                     onChange={(e) => setCardMnemonic(e.target.value)}
-                    placeholder={t('e.g., Sounds like \'labas\' — imagine a lab assistant')}
+                    placeholder={t('e.g., Break it into sounds and picture the meaning')}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-sm text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                   />
                 </div>
@@ -2267,7 +2269,7 @@ export function DeckWorkspace({
                     setJsonText(e.target.value);
                     setJsonError(null);
                   }}
-                  placeholder={`{\n  "name": "Lithuanian Food",\n  "cards": [\n    { "word": "obuolys", "translation": "alma", "exampleSentence": "Raudonas obuolys." }\n  ]\n}`}
+                  placeholder={`{\n  "name": "My Deck",\n  "cards": [\n    { "word": "hello", "translation": "greeting", "exampleSentence": "Hello there!" }\n  ]\n}`}
                   className="w-full px-3.5 py-2.5 rounded-lg bg-[#FAF8F5] dark:bg-[#121110] border border-slate-200 dark:border-[#2E2A25] text-xs font-mono text-[#1C1917] dark:text-[#F5F2EC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B45309]"
                 />
 

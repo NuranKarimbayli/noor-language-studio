@@ -298,13 +298,13 @@ export const RU: Record<string, string> = {
   'Save Changes': 'Сохранить изменения',
   
   
-  'e.g., Labas rytas!': 'напр., Доброе утро!',
+  'e.g., Hello there!': 'напр., Здравствуйте!',
   'e.g., its meaning in your language': 'напр., его значение на вашем языке',
   'e.g., verbs, food, travel': 'напр., глаголы, еда, путешествия',
   'Comma-separated — used for filtering and smart decks.':
     'Через запятую — для фильтрации и умных колод.',
-  'e.g., Sounds like \'labas\' — imagine a lab assistant':
-    'напр., звучит как «лабас» — представьте лаборанта',
+  'e.g., Break it into sounds and picture the meaning':
+    'напр., Разбейте слово на звуки и представьте значение',
   'Memory tip:': 'Мнемоника:',
   'Send to notebook': 'Отправить в блокнот',
   'Open linked notebook note': 'Открыть связанную заметку',

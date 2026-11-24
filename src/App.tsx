@@ -1835,6 +1835,9 @@ export default function App() {
 
   const handleTopAddWords = () => {
     exitSession();
+    // The Add Words modal lives in DeckWorkspace (Words view) — switch to it
+    // first so the trigger is consumed immediately from any view.
+    setWorkspaceView('words');
     setAddWordsTrigger((n) => n + 1);
   };
 
