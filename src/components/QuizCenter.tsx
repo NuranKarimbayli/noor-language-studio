@@ -9,6 +9,7 @@ import {
   Mic,
   Play,
   RotateCcw,
+  SkipForward,
   SlidersHorizontal,
   Volume2,
   XCircle,
@@ -899,6 +900,35 @@ export function QuizCenter({
     }, 300);
   }, [currentQuestion, currentRecord, onRecordAnswer, triggerFeedback, enqueueRelearnQuestion]);
 
+  // Pass: skip a question the user doesn't know yet. Records a neutral
+  // 'passed' marker for the breakdown — no SRS update, no stats increment,
+  // no relearn enqueue, and excluded from accuracy denominators.
+  const handlePass = useCallback(() => {
+    if (!currentQuestion || currentRecord || submissionLockRef.current) return;
+    submissionLockRef.current = true;
+    cooldownDeadlineRef.current = null;
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    if (relaunchTimerRef.current !== null) {
+      window.clearTimeout(relaunchTimerRef.current);
+      relaunchTimerRef.current = null;
+    }
+    speechDoneRef.current = true;
+
+    const passRecord: QuizAnswerRecord = {
+      question: currentQuestion,
+      userAnswer: t('Passed'),
+      status: 'passed',
+      isCorrect: false,
+    };
+    setCurrentRecord(passRecord);
+    setRecords((prev) => [...prev, passRecord]);
+
+    setTimeout(() => {
+      submissionLockRef.current = false;
+    }, 300);
+  }, [currentQuestion, currentRecord]);
+
   // --- Cooldown timer -------------------------------------------------------
   // Wall-clock deadline armed once per question; immune to effect re-runs,
   // tab-switch throttling, and early answers.
@@ -1026,10 +1056,11 @@ export function QuizCenter({
       setPhase('results');
       playCompleteSound(sfxMuted);
       const answered = recordsRef.current;
+      const attempted = answered.filter((r) => r.status !== 'passed');
       onQuizComplete?.({
         mode: sessionConfig.mode,
-        total: questions.length,
-        correct: answered.filter((r) => r.isCorrect).length,
+        total: attempted.length,
+        correct: attempted.filter((r) => r.isCorrect).length,
         durationMs: Math.max(0, performance.now() - sessionStartRef.current),
         bestStreak,
       });
@@ -1083,6 +1114,14 @@ export function QuizCenter({
           target.tagName === 'SELECT' ||
           target.isContentEditable)
       ) {
+        return;
+      }
+
+      // "P" passes on the current question in every mode (ignored while a
+      // record exists or while typing inside a field).
+      if (!currentRecord && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handlePass();
         return;
       }
 
@@ -1151,6 +1190,7 @@ export function QuizCenter({
     handleTrueFalseSelect,
     handleMultipleChoiceSelect,
     handleNextQuestion,
+    handlePass,
     replayPrompt,
   ]);
 
@@ -1178,7 +1218,12 @@ export function QuizCenter({
   );
 
   const missedRecords = useMemo(
-    () => records.filter((r) => !r.isCorrect),
+    () => records.filter((r) => !r.isCorrect && r.status !== 'passed'),
+    [records]
+  );
+
+  const passedCount = useMemo(
+    () => records.filter((r) => r.status === 'passed').length,
     [records]
   );
 
@@ -1225,6 +1270,20 @@ export function QuizCenter({
                 {t('Smart Review')}
               </span>
             )}
+            {!currentRecord && (
+              <button
+                type="button"
+                onClick={handlePass}
+                title={t('Skip this question without penalty (P)')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-xs font-medium text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] hover:border-slate-300 dark:hover:border-[#3A352F] transition-colors"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+                <span>{t('Pass')}</span>
+                <kbd className="hidden sm:inline font-mono text-[10px] px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E] text-[#78716C] dark:text-[#A8A29E]">
+                  P
+                </kbd>
+              </button>
+            )}
             <button
               type="button"
               onClick={onOpenSetup}
@@ -1245,7 +1304,8 @@ export function QuizCenter({
               </span>
               <span aria-hidden="true">·</span>
               <span>
-                Score: {scoreCount}/{records.length}
+                Score: {scoreCount}/{records.length - passedCount}
+                {passedCount > 0 ? ` · ${passedCount} ${t('passed')}` : ''}
               </span>
               {streak >= 2 && (
                 <motion.span
@@ -1664,6 +1724,8 @@ export function QuizCenter({
                     <CheckCircle2 className="w-5 h-5 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
                   ) : currentRecord.status === 'typo' ? (
                     <Check className="w-5 h-5 text-[#B45309] dark:text-[#F59E0B] shrink-0 mt-0.5" />
+                  ) : currentRecord.status === 'passed' ? (
+                    <SkipForward className="w-5 h-5 text-sky-700 dark:text-sky-400 shrink-0 mt-0.5" />
                   ) : (
                     <XCircle className="w-5 h-5 text-red-700 dark:text-red-400 shrink-0 mt-0.5" />
                   )}
@@ -1690,6 +1752,19 @@ export function QuizCenter({
                         </span>
                         <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
                           Exact spelling:{' '}
+                          <strong className="text-[#1C1917] dark:text-[#F5F2EC] select-text">
+                            {currentQuestion.expectedAnswer}
+                          </strong>
+                        </p>
+                      </div>
+                    )}
+                    {currentRecord.status === 'passed' && (
+                      <div className="space-y-0.5">
+                        <span className="font-semibold text-sky-800 dark:text-sky-300">
+                          {t('Passed — no penalty')}
+                        </span>
+                        <p className="text-xs text-[#57534E] dark:text-[#A8A29E]">
+                          {t('Answer was')}{' '}
                           <strong className="text-[#1C1917] dark:text-[#F5F2EC] select-text">
                             {currentQuestion.expectedAnswer}
                           </strong>
@@ -1731,8 +1806,10 @@ export function QuizCenter({
     );
   }
 
+  // Passed questions are neutral — excluded from the accuracy denominator.
+  const attemptedCount = records.length - passedCount;
   const accuracyPct =
-    records.length > 0 ? Math.round((scoreCount / records.length) * 100) : 0;
+    attemptedCount > 0 ? Math.round((scoreCount / attemptedCount) * 100) : 0;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -1867,6 +1944,8 @@ export function QuizCenter({
                   <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
                 ) : rec.status === 'typo' ? (
                   <Check className="w-4 h-4 text-[#B45309] dark:text-[#F59E0B] shrink-0" />
+                ) : rec.status === 'passed' ? (
+                  <SkipForward className="w-4 h-4 text-sky-700 dark:text-sky-400 shrink-0" />
                 ) : (
                   <XCircle className="w-4 h-4 text-red-700 dark:text-red-400 shrink-0" />
                 )}
@@ -1884,14 +1963,21 @@ export function QuizCenter({
                 <span className="font-medium text-[#1C1917] dark:text-[#F5F2EC]">
                   {rec.question.expectedAnswer}
                 </span>
-                {!rec.isCorrect && (
+                {rec.status === 'passed' ? (
                   <>
                     {' · '}
-                    Your answer:{' '}
-                    <span className="text-red-700 dark:text-red-400">
-                      {rec.userAnswer || (rec.status === 'timeout' ? '(Timed out)' : '(Blank)')}
-                    </span>
+                    <span className="text-sky-700 dark:text-sky-400">{t('Passed')}</span>
                   </>
+                ) : (
+                  !rec.isCorrect && (
+                    <>
+                      {' · '}
+                      Your answer:{' '}
+                      <span className="text-red-700 dark:text-red-400">
+                        {rec.userAnswer || (rec.status === 'timeout' ? '(Timed out)' : '(Blank)')}
+                      </span>
+                    </>
+                  )
                 )}
                 {rec.status === 'typo' && (
                   <>

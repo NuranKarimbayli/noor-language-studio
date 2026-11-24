@@ -642,7 +642,7 @@ export async function deleteSmartDecksByLanguage(languageId: string): Promise<vo
  */
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'smartDecks', 'meta', 'notes'], 'readwrite');
+  const tx = db.transaction(['languages', 'decks', 'cards', 'stats', 'theme', 'sfxMuted', 'ttsMuted', 'activity', 'sessions', 'smartDecks', 'meta', 'notes', 'masterySnapshots'], 'readwrite');
   await Promise.all([
     tx.objectStore('languages').clear(),
     tx.objectStore('decks').clear(),
@@ -656,6 +656,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('smartDecks').clear(),
     tx.objectStore('meta').clear(),
     tx.objectStore('notes').clear(),
+    tx.objectStore('masterySnapshots').clear(),
   ]);
   await tx.done;
 }

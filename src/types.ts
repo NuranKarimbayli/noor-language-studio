@@ -114,7 +114,7 @@ export interface QuizQuestion {
   isTrueStatement?: boolean;
 }
 
-export type AnswerStatus = 'exact' | 'typo' | 'incorrect' | 'timeout';
+export type AnswerStatus = 'exact' | 'typo' | 'incorrect' | 'timeout' | 'passed';
 
 export interface QuizAnswerRecord {
   question: QuizQuestion;

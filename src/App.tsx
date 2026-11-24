@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AudioLines, CalendarClock, DatabaseBackup, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { AudioLines, CalendarClock, DatabaseBackup, Keyboard, Menu, MicOff, Moon, PanelLeft, Plus, Search, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { Collapsible } from './components/Collapsible';
 import { CommandPalette, type PaletteActionId } from './components/CommandPalette';
 import { pluralize, setUiLanguage, t } from './i18n';
 import { DeckWorkspace } from './components/DeckWorkspace';
@@ -79,6 +80,7 @@ import {
   addLanguage,
   addSessionRecord,
   addSmartDeck,
+  clearAllData,
   deleteCard as dbDeleteCard,
   deleteCardsByIds,
   deleteDeck as dbDeleteDeck,
@@ -206,6 +208,10 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [masterySnapshots, setMasterySnapshots] = useState<MasterySnapshot[]>([]);
   const toastTimeoutsRef = useRef<Set<number>>(new Set());
+  // Per-view scroll memory: the document scrolls on window, so each view /
+  // session keeps its own offset and restores it on return.
+  const viewScrollRef = useRef<Record<string, number>>({});
+  const scrollKeyRef = useRef('');
 
   // Initialize IndexedDB and load initial data
   useEffect(() => {
@@ -337,6 +343,36 @@ export default function App() {
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, [appPrefs.reducedMotion]);
+
+  // Independent scroll position per view/session/language-picker. The scroll
+  // listener records the live offset under the current key; on navigation we
+  // restore the target view's remembered offset (0 for a first visit) once the
+  // view-transition animation has settled.
+  const scrollKey =
+    stage === 'workspace'
+      ? activeSession
+        ? `session:${activeLanguageId}`
+        : `view:${workspaceView}`
+      : 'languages';
+
+  useEffect(() => {
+    const prevKey = scrollKeyRef.current;
+    scrollKeyRef.current = scrollKey;
+    if (prevKey === scrollKey) return;
+    const targetY = viewScrollRef.current[scrollKey] ?? 0;
+    const timer = window.setTimeout(() => {
+      window.scrollTo(0, targetY);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [scrollKey]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      viewScrollRef.current[scrollKeyRef.current] = window.scrollY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Cleanup audio context and speech on unmount
   useEffect(() => {
@@ -509,9 +545,18 @@ export default function App() {
     setActiveSession(null);
   }, []);
 
+  // Effective appearance for the header quick-toggle: explicit light/dark
+  // wins; 'system' resolves against the OS preference.
+  const isDarkMode =
+    theme === 'dark' ||
+    (theme === 'system' &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Header quick-toggle is strictly two-way: Light <-> Dark. The 'system'
+  // option lives only in Settings → Appearance.
   const toggleTheme = () => {
-    // Header quick-toggle cycles light -> dark -> system -> light
-    setTheme((prev) => (prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light'));
+    setTheme(isDarkMode ? 'light' : 'dark');
   };
 
   const toggleSfxMute = () => {
@@ -566,6 +611,49 @@ export default function App() {
       bestQuizStreak: 0,
     }));
     notify(t('Study statistics reset — progress history cleared'), 'success');
+  }, [notify]);
+
+  // Factory reset: wipe every IndexedDB store and return to the clean
+  // 0-data state (language picker). Only reachable through the strict
+  // type-to-confirm dialog in Settings → Danger Zone.
+  const handleFullReset = useCallback(async () => {
+    await clearAllData();
+    clearAllResumeSessions();
+    setLanguages([]);
+    setDecks([]);
+    setCards([]);
+    setNotes([]);
+    setSmartDecks([]);
+    setSessions([]);
+    setActivity([]);
+    setMasterySnapshots([]);
+    setStudyStats({
+      streakDays: 0,
+      lastStudyDate: null,
+      totalQuizAnswered: 0,
+      totalQuizCorrect: 0,
+      bestQuizStreak: 0,
+    });
+    setAppPrefs({
+      showToasts: true,
+      autoAdvance: false,
+      defaultTimerSeconds: 0,
+      autoSpeakPrompt: false,
+      autoSpeakAnswer: false,
+      reminderEnabled: false,
+    });
+    setTheme('light');
+    setSfxMuted(false);
+    setTtsMuted(false);
+    setActiveLanguageId('');
+    setSelectedDeckId('');
+    setActiveSession(null);
+    setQuizSetupOpen(false);
+    setQuizResumeState(null);
+    setFlashResumeState(null);
+    setWorkspaceView('words');
+    setStage('languages');
+    notify(t('All data erased — Noor Language Studio is back to a clean start'), 'success');
   }, [notify]);
 
   // Record daily study activity (reviews / quizzes) into IndexedDB
@@ -2017,32 +2105,15 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setWorkspaceView('settings')}
-                aria-label={t('Settings')}
-                title={t('Settings')}
-                className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
-              >
-                <Settings2 className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
                 onClick={toggleTheme}
-                aria-label={
-                  theme === 'light'
-                    ? t('Switch to dark mode')
-                    : theme === 'dark'
-                      ? t('Switch to system theme')
-                      : t('Switch to light mode')
-                }
+                aria-label={isDarkMode ? t('Switch to light mode') : t('Switch to dark mode')}
+                title={isDarkMode ? t('Switch to light mode') : t('Switch to dark mode')}
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
-                {theme === 'light' ? (
-                  <Moon className="w-4 h-4" />
-                ) : theme === 'dark' ? (
+                {isDarkMode ? (
                   <Sun className="w-4 h-4 text-[#F59E0B]" />
                 ) : (
-                  <Monitor className="w-4 h-4" />
+                  <Moon className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -2166,24 +2237,15 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setWorkspaceView('settings')}
-                aria-label={t('Settings')}
-                title={t('Settings')}
-                className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
-              >
-                <Settings2 className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
                 onClick={toggleTheme}
-                aria-label={theme === 'light' ? t('Switch to dark mode') : t('Switch to light mode')}
+                aria-label={isDarkMode ? t('Switch to light mode') : t('Switch to dark mode')}
+                title={isDarkMode ? t('Switch to light mode') : t('Switch to dark mode')}
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
               >
-                {theme === 'light' ? (
-                  <Moon className="w-4 h-4" />
-                ) : (
+                {isDarkMode ? (
                   <Sun className="w-4 h-4 text-[#F59E0B]" />
+                ) : (
+                  <Moon className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -2265,7 +2327,7 @@ export default function App() {
                   />
                   <div className="flex-1 min-w-0 px-4 sm:px-6 py-8 sm:py-12">
                     <div className="max-w-4xl mx-auto space-y-10">
-                  {showDueBanner && (
+                  <Collapsible open={showDueBanner}>
                     <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <CalendarClock className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
@@ -2293,8 +2355,8 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                  )}
-                  {showBackupReminder && (
+                  </Collapsible>
+                  <Collapsible open={showBackupReminder}>
                     <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <DatabaseBackup className="w-4 h-4 text-sky-700 dark:text-sky-400 shrink-0" />
@@ -2328,7 +2390,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                  )}
+                  </Collapsible>
                   <OnboardingChecklist
                     decks={languageDecks}
                     cards={languageCards}
@@ -2465,6 +2527,7 @@ export default function App() {
                       }
                       onResetDefaults={handleResetSettings}
                       onResetStatistics={handleResetStatistics}
+                      onFullReset={handleFullReset}
                       autoSpeakPrompt={appPrefs.autoSpeakPrompt}
                       onAutoSpeakPromptChange={(enabled) =>
                         setAppPrefs((prev) => ({ ...prev, autoSpeakPrompt: enabled }))

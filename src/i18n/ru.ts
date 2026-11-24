@@ -855,6 +855,66 @@ export const RU: Record<string, string> = {
   'Preferences, backup & data': 'Настройки, резервные копии и данные',
   'Your last backup was {days} days ago — consider exporting one before resetting.':
     'Последняя резервная копия была {days} дн. назад — рекомендуем сделать новую перед сбросом.',
+  'Pass': 'Пропустить',
+  'Passed': 'Пропущено',
+  'passed': 'пропущено',
+  'Passed — no penalty': 'Пропущено — без штрафа',
+  'Answer was': 'Ответ:',
+  'Skip this question without penalty (P)': 'Пропустить вопрос без штрафа (P)',
+  'Erase all data': 'Стереть все данные',
+  'Factory reset: permanently delete every language, deck, word, note, statistic, session record, and preference — the app returns to a completely clean state. This cannot be undone.':
+    'Полный сброс: безвозвратно удалить все языки, колоды, слова, заметки, статистику, записи сессий и настройки — приложение вернётся к полностью чистому состоянию. Это действие нельзя отменить.',
+  'Erase everything…': 'Стереть всё…',
+  'Erase everything': 'Стереть всё',
+  'Erasing…': 'Стирание…',
+  'Confirm full reset': 'Подтверждение полного сброса',
+  'Erase everything?': 'Стереть всё?',
+  'All languages, decks, words, tags, and mnemonics':
+    'Все языки, колоды, слова, теги и мнемоники',
+  'All notes and smart decks': 'Все заметки и умные колоды',
+  'Study stats, session history, activity, and mastery snapshots':
+    'Статистика занятий, история сессий, активность и снимки прогресса',
+  'Every preference on this page, including backup reminders and interface language':
+    'Все настройки на этой странице, включая напоминания о копиях и язык интерфейса',
+  'Export a backup first if you want to keep a copy of your data.':
+    'Сначала экспортируйте резервную копию, если хотите сохранить данные.',
+  'All data erased — Noor Language Studio is back to a clean start':
+    'Все данные стёрты — Noor Language Studio снова в чистом состоянии',
+  'Add your first words to start building your streak.':
+    'Добавьте первые слова, чтобы начать серию занятий.',
+  '{count}-day streak — consistency is compounding.':
+    'Серия {count} дн. — регулярность даёт результат.',
+  'All caught up — nothing is due right now. Enjoy the breather!':
+    'Всё повторено — сейчас ничего не требуется. Отдохните!',
+  'Excellent quiz accuracy — your recall is getting sharper.':
+    'Отличная точность в тестах — память становится точнее.',
+  'A busy review week ahead — little and often beats cramming.':
+    'Впереди насыщенная неделя повторений — понемногу и часто лучше, чем зубрёжка.',
+  'The limits of my language are the limits of my world.':
+    'Границы моего языка — границы моего мира.',
+  'Ludwig Wittgenstein': 'Людвиг Витгенштейн',
+  'The expert in anything was once a beginner.':
+    'Экспертом в чём угодно когда-то был новичок.',
+  'Helen Hayes': 'Хелен Хейс',
+  'Little by little, one travels far.':
+    'Потихоньку — и далеко уйдёшь.',
+  'J.R.R. Tolkien': 'Дж. Р. Р. Толкин',
+  'You don\'t have to be great to start, but you have to start to be great.':
+    'Чтобы начать, не нужно быть великим, но чтобы стать великим, нужно начать.',
+  'Simplicity is the ultimate sophistication.':
+    'Простота — это совершенная изысканность.',
+  'Leonardo da Vinci': 'Леонардо да Винчи',
+  'We are what we repeatedly do. Excellence is not an act, but a habit.':
+    'Мы — это то, что мы делаем постоянно. Совершенство — не поступок, а привычка.',
+  'Will Durant': 'Уилл Дюран',
+  'It is not that we have a short time to live, but that we waste a lot of it.':
+    'Дело не в том, что жизнь коротка, а в том, что мы много её теряем.',
+  'Seneca': 'Сенека',
+  'First, solve the problem. Then, write the code.':
+    'Сначала реши задачу. Потом напиши код.',
+  'John Johnson': 'Джон Джонсон',
+  'The best way to predict the future is to invent it.':
+    'Лучший способ предсказать будущее — изобрести его.',
 };
 
 // Russian one/few/many plural forms keyed by the English singular noun.

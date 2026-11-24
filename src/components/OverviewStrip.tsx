@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { CalendarClock, Flame, RefreshCw, Shuffle, Zap } from 'lucide-react';
+import { CalendarClock, Flame, RefreshCw, Shuffle, Sparkles, Zap } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
 import { getReviewForecast, isCardDue, isWeakCard } from '../utils/srs';
@@ -22,6 +22,15 @@ const DAILY_QUOTES: Array<{ text: string; author?: string }> = [
   { text: t('Mistakes are proof that you are actively recalling, not passively reading.') },
   { text: t('A different language is a different vision of life.'), author: t('Federico Fellini') },
   { text: t('Fluency grows one recalled word at a time.') },
+  { text: t('The limits of my language are the limits of my world.'), author: t('Ludwig Wittgenstein') },
+  { text: t('The expert in anything was once a beginner.'), author: t('Helen Hayes') },
+  { text: t('Little by little, one travels far.'), author: t('J.R.R. Tolkien') },
+  { text: t('You don\'t have to be great to start, but you have to start to be great.') },
+  { text: t('Simplicity is the ultimate sophistication.'), author: t('Leonardo da Vinci') },
+  { text: t('We are what we repeatedly do. Excellence is not an act, but a habit.'), author: t('Will Durant') },
+  { text: t('It is not that we have a short time to live, but that we waste a lot of it.'), author: t('Seneca') },
+  { text: t('First, solve the problem. Then, write the code.'), author: t('John Johnson') },
+  { text: t('The best way to predict the future is to invent it.') },
 ];
 
 function getDayOfYear(): number {
@@ -102,22 +111,52 @@ function OverviewStripInner({
       ? Math.round((stats.totalQuizCorrect / stats.totalQuizAnswered) * 100)
       : null;
 
+  // Context-aware nudge: takes precedence over the daily quote when the
+  // learner's current state suggests a more useful message.
+  const contextNudge = useMemo(() => {
+    if (cards.length === 0) {
+      return t('Add your first words to start building your streak.');
+    }
+    if (stats.streakDays >= 7) {
+      return t('{count}-day streak — consistency is compounding.', {
+        count: stats.streakDays,
+      });
+    }
+    if (dueCount === 0) {
+      return t('All caught up — nothing is due right now. Enjoy the breather!');
+    }
+    if (accuracyPct !== null && accuracyPct >= 90) {
+      return t('Excellent quiz accuracy — your recall is getting sharper.');
+    }
+    if (forecast.today > 0 && forecast.thisWeek > forecast.today * 3) {
+      return t('A busy review week ahead — little and often beats cramming.');
+    }
+    return null;
+  }, [cards.length, stats.streakDays, dueCount, accuracyPct, forecast]);
+
   return (
     <section className="space-y-4">
       {/* Row 1: Daily Motivation + Smart Review & Word of the Day */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
         {/* Left column: Daily Quote + Smart Review Quick Action */}
         <div className="md:col-span-7 flex flex-col justify-between gap-3.5">
-          {/* Daily Motivation Quote */}
+          {/* Daily Motivation Quote / context-aware nudge */}
           <div className="flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl bg-[#F3EFE8]/70 dark:bg-[#171513] border border-slate-200 dark:border-[#2E2A25]">
-            <p className="text-xs sm:text-sm italic text-[#57534E] dark:text-[#C4BEB4] leading-relaxed">
-              “{t(quote.text)}”
-              {quote.author && (
-                <span className="not-italic text-[#78716C] dark:text-[#A8A29E] ml-2">
-                  — {quote.author}
-                </span>
-              )}
-            </p>
+            {contextNudge ? (
+              <p className="text-xs sm:text-sm font-medium text-[#1C1917] dark:text-[#F5F2EC] leading-relaxed flex items-start gap-2">
+                <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#B45309] dark:text-[#F59E0B]" />
+                <span>{contextNudge}</span>
+              </p>
+            ) : (
+              <p className="text-xs sm:text-sm italic text-[#57534E] dark:text-[#C4BEB4] leading-relaxed">
+                “{t(quote.text)}”
+                {quote.author && (
+                  <span className="not-italic text-[#78716C] dark:text-[#A8A29E] ml-2">
+                    — {quote.author}
+                  </span>
+                )}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setQuoteOffset((n) => n + 1)}
