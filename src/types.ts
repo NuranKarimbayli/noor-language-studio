@@ -17,7 +17,7 @@ export type SessionMode = 'flashcards' | QuizMode;
 export type AppStage = 'languages' | 'workspace';
 
 // Focused workspace views behind the sidebar navigation
-export type WorkspaceView = 'words' | 'quiz' | 'stats' | 'notes';
+export type WorkspaceView = 'words' | 'quiz' | 'stats' | 'notes' | 'settings';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -146,6 +146,9 @@ export interface AppPrefs {
   notesAutoSaveSeconds?: number; // debounce interval for auto-save (1|2|5|10)
   lastBackupAt?: string; // ISO timestamp of the last full-backup export
   uiLanguage?: 'en' | 'ru'; // interface language (independent of study language)
+  reducedMotion?: 'system' | 'on' | 'off'; // motion override; undefined/'system' follows prefers-reduced-motion
+  defaultLanding?: 'words' | 'quiz' | 'stats' | 'notes'; // workspace view opened on startup
+  backupReminderDays?: number; // backup nudge interval in days, 0/undefined = off
 }
 
 // Freeform study notes ("note sheets"), persisted in IndexedDB and included

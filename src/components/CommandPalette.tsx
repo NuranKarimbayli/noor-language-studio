@@ -8,6 +8,7 @@ import {
   NotebookPen,
   Plus,
   Search,
+  Settings,
   Sparkles,
   X,
   Zap,
@@ -22,7 +23,8 @@ export type PaletteActionId =
   | 'smart-review'
   | 'due-review'
   | 'new-note'
-  | 'export-backup';
+  | 'export-backup'
+  | 'open-settings';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -55,6 +57,7 @@ const ACTIONS: Array<{
   { id: 'new-deck', label: t('New Deck'), hint: t('Create a vocabulary deck'), icon: Layers, keywords: 'create deck folder' },
   { id: 'new-note', label: t('New Note'), hint: t('Blacknotes sheet'), icon: NotebookPen, keywords: 'notebook write note' },
   { id: 'export-backup', label: t('Export Backup'), hint: t('Download full JSON backup'), icon: Download, keywords: 'backup export json save data' },
+  { id: 'open-settings', label: t('Settings'), hint: t('Preferences, backup & data'), icon: Settings, keywords: 'settings preferences options backup data' },
 ];
 
 /** Subsequence fuzzy match — returns a score (lower = better) or null. */

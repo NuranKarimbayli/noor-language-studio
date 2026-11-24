@@ -7,6 +7,7 @@ import {
   NotebookPen,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ const NAV_ITEMS: Array<{
   { id: 'quiz', label: t('Quiz'), icon: Brain },
   { id: 'stats', label: t('Statistics'), icon: BarChart3 },
   { id: 'notes', label: t('Notes'), icon: NotebookPen },
+  { id: 'settings', label: t('Settings'), icon: Settings },
 ];
 
 export function Sidebar({

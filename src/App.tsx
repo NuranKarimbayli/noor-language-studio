@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AudioLines, CalendarClock, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
+import { AudioLines, CalendarClock, DatabaseBackup, Keyboard, Menu, MicOff, Monitor, Moon, PanelLeft, Plus, Search, Settings2, Sun, Volume2, VolumeX, X } from 'lucide-react';
 import { CommandPalette, type PaletteActionId } from './components/CommandPalette';
 import { pluralize, setUiLanguage, t } from './i18n';
 import { DeckWorkspace } from './components/DeckWorkspace';
@@ -14,7 +14,7 @@ import { ActivitySection } from './components/ActivitySection';
 import { QuizCenter } from './components/QuizCenter';
 import { QuizLauncher } from './components/QuizLauncher';
 import { QuizSetupModal } from './components/QuizSetupModal';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsPage } from './components/SettingsPage';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/Toast';
@@ -177,6 +177,7 @@ export default function App() {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [smartDecks, setSmartDecks] = useState<SmartDeck[]>([]);
   const [dueBannerDismissedFor, setDueBannerDismissedFor] = useState<string>('');
+  const [backupReminderSnoozedAt, setBackupReminderSnoozedAt] = useState(0);
   const [appPrefs, setAppPrefs] = useState<AppPrefs>({
     showToasts: true,
     autoAdvance: false,
@@ -189,7 +190,7 @@ export default function App() {
   // call in children already resolves the active locale.
   setUiLanguage(appPrefs.uiLanguage ?? 'en');
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('words');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -252,6 +253,9 @@ export default function App() {
         setSmartDecks(loadedSmartDecks);
         setNotes(loadedNotes);
         setAppPrefs(loadedPrefs);
+        if (loadedPrefs.defaultLanding) {
+          setWorkspaceView(loadedPrefs.defaultLanding);
+        }
 
         setActiveLanguageId(loadedLanguages[0]?.id ?? PRESET_LANGUAGES[0].id);
         setSelectedDeckId(loadedDecks[0]?.id ?? '');
@@ -319,6 +323,21 @@ export default function App() {
     root.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  // Motion preference: 'system' follows prefers-reduced-motion, 'on' forces
+  // reduced motion, 'off' opts out of the OS preference entirely.
+  useEffect(() => {
+    const root = document.documentElement;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => {
+      const pref = appPrefs.reducedMotion ?? 'system';
+      root.classList.toggle('reduce-motion', pref === 'on' || (pref === 'system' && mq.matches));
+      root.classList.toggle('motion-full', pref === 'off');
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [appPrefs.reducedMotion]);
+
   // Cleanup audio context and speech on unmount
   useEffect(() => {
     return () => {
@@ -361,6 +380,25 @@ export default function App() {
     !activeSession &&
     dueTodayCount > 0 &&
     dueBannerDismissedFor !== getLocalDateString();
+
+  // Backup reminder (Settings → Notifications → Backup reminders): nudge at
+  // most once per configured interval while a backup is overdue. Never-backed-up
+  // counts as overdue once the user has any cards.
+  const backupReminderDays = appPrefs.backupReminderDays ?? 0;
+  const backupReminderDue = useMemo(() => {
+    if (!backupReminderDays || languageCards.length === 0) return false;
+    if (!appPrefs.lastBackupAt) return true;
+    const days = (Date.now() - Date.parse(appPrefs.lastBackupAt)) / 86400000;
+    return Number.isFinite(days) && days >= backupReminderDays;
+  }, [backupReminderDays, appPrefs.lastBackupAt, languageCards.length]);
+  const backupReminderSnoozedUntil = useMemo(() => {
+    if (backupReminderSnoozedAt <= 0) return 0;
+    return backupReminderSnoozedAt + backupReminderDays * 86400000;
+  }, [backupReminderSnoozedAt, backupReminderDays]);
+  const showBackupReminder =
+    stage === 'workspace' &&
+    backupReminderDue &&
+    Date.now() >= backupReminderSnoozedUntil;
 
   // Optional browser reminders: at most one Notification per day, only when
   // cards are actually due and permission was granted in Settings. Depends on
@@ -490,16 +528,25 @@ export default function App() {
 
   const handleResetSettings = () => {
     setTheme('light');
+    setWorkspaceView('words');
     setSfxMuted(false);
     setTtsMuted(false);
-    setAppPrefs({
+    setAppPrefs((prev) => ({
       showToasts: true,
       autoAdvance: false,
       defaultTimerSeconds: 0,
       autoSpeakPrompt: false,
       autoSpeakAnswer: false,
       reminderEnabled: false,
-    });
+      notesAutoSave: true,
+      notesAutoSaveSeconds: 2,
+      reducedMotion: 'system',
+      defaultLanding: 'words',
+      backupReminderDays: 0,
+      uiLanguage: prev.uiLanguage,
+      onboardingDismissed: prev.onboardingDismissed,
+      lastBackupAt: prev.lastBackupAt,
+    }));
     notify(t('Settings reset to defaults'), 'success');
   };
 
@@ -1682,7 +1729,7 @@ export default function App() {
       }
 
       const uiOpen =
-        quizSetupOpen || settingsOpen || shortcutsOpen || paletteOpen;
+        quizSetupOpen || shortcutsOpen || paletteOpen;
       if (
         typing ||
         e.ctrlKey ||
@@ -1735,7 +1782,6 @@ export default function App() {
     stage,
     activeSession,
     quizSetupOpen,
-    settingsOpen,
     shortcutsOpen,
     paletteOpen,
   ]);
@@ -1882,6 +1928,9 @@ export default function App() {
         case 'export-backup':
           handleExportAllBackup();
           break;
+        case 'open-settings':
+          setWorkspaceView('settings');
+          break;
       }
     },
     [handleStartSmartReview, handleStartDueReview, handleCreateNote, handleExportAllBackup]
@@ -1968,7 +2017,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => setWorkspaceView('settings')}
                 aria-label={t('Settings')}
                 title={t('Settings')}
                 className="p-2 rounded-lg bg-white dark:bg-[#1C1A17] border border-slate-200 dark:border-[#2E2A25] text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
@@ -2117,7 +2166,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => setWorkspaceView('settings')}
                 aria-label={t('Settings')}
                 title={t('Settings')}
                 className="p-2 rounded-lg text-[#57534E] dark:text-[#A8A29E] hover:text-[#1C1917] dark:hover:text-[#F5F2EC] transition-colors shrink-0"
@@ -2245,6 +2294,41 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                  {showBackupReminder && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <DatabaseBackup className="w-4 h-4 text-sky-700 dark:text-sky-400 shrink-0" />
+                        <p className="text-sm text-sky-900 dark:text-sky-200 truncate">
+                          {appPrefs.lastBackupAt
+                            ? t('Your last backup was {days} days ago — your data lives only in this browser.', {
+                                days: Math.floor(
+                                  (Date.now() - Date.parse(appPrefs.lastBackupAt)) / 86400000
+                                ),
+                              })
+                            : t('You have no backup yet — your data lives only in this browser.')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleExportAllBackup}
+                          className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition-colors"
+                        >
+                          {t('Export Backup')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBackupReminderSnoozedAt(Date.now())
+                          }
+                          aria-label={t('Dismiss backup reminder')}
+                          className="p-1.5 rounded-lg text-sky-700/70 dark:text-sky-400/70 hover:text-sky-900 dark:hover:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <OnboardingChecklist
                     decks={languageDecks}
                     cards={languageCards}
@@ -2355,6 +2439,73 @@ export default function App() {
                       onConsumeFocusNote={handleConsumeFocusNote}
                     />
                   )}
+
+                  {workspaceView === 'settings' && (
+                    <SettingsPage
+                      theme={theme}
+                      onThemeChange={setTheme}
+                      soundEffectsEnabled={!sfxMuted}
+                      onSoundEffectsChange={(enabled) => setSfxMuted(!enabled)}
+                      speechEnabled={!ttsMuted}
+                      onSpeechChange={(enabled) => {
+                        setTtsMuted(!enabled);
+                        if (!enabled) stopSpeaking();
+                      }}
+                      showToasts={appPrefs.showToasts}
+                      onShowToastsChange={(enabled) =>
+                        setAppPrefs((prev) => ({ ...prev, showToasts: enabled }))
+                      }
+                      autoAdvance={appPrefs.autoAdvance}
+                      onAutoAdvanceChange={(enabled) =>
+                        setAppPrefs((prev) => ({ ...prev, autoAdvance: enabled }))
+                      }
+                      defaultTimerSeconds={appPrefs.defaultTimerSeconds}
+                      onDefaultTimerChange={(seconds) =>
+                        setAppPrefs((prev) => ({ ...prev, defaultTimerSeconds: seconds }))
+                      }
+                      onResetDefaults={handleResetSettings}
+                      onResetStatistics={handleResetStatistics}
+                      autoSpeakPrompt={appPrefs.autoSpeakPrompt}
+                      onAutoSpeakPromptChange={(enabled) =>
+                        setAppPrefs((prev) => ({ ...prev, autoSpeakPrompt: enabled }))
+                      }
+                      autoSpeakAnswer={appPrefs.autoSpeakAnswer}
+                      onAutoSpeakAnswerChange={(enabled) =>
+                        setAppPrefs((prev) => ({ ...prev, autoSpeakAnswer: enabled }))
+                      }
+                      reminderEnabled={appPrefs.reminderEnabled}
+                      onReminderChange={handleReminderEnabledChange}
+                      notesAutoSave={appPrefs.notesAutoSave ?? true}
+                      onNotesAutoSaveChange={(enabled) =>
+                        setAppPrefs((prev) => ({ ...prev, notesAutoSave: enabled }))
+                      }
+                      notesAutoSaveSeconds={appPrefs.notesAutoSaveSeconds ?? 2}
+                      onNotesAutoSaveSecondsChange={(seconds) =>
+                        setAppPrefs((prev) => ({ ...prev, notesAutoSaveSeconds: seconds }))
+                      }
+                      reducedMotion={appPrefs.reducedMotion ?? 'system'}
+                      onReducedMotionChange={(pref) =>
+                        setAppPrefs((prev) => ({ ...prev, reducedMotion: pref }))
+                      }
+                      defaultLanding={appPrefs.defaultLanding ?? 'words'}
+                      onDefaultLandingChange={(view) =>
+                        setAppPrefs((prev) => ({ ...prev, defaultLanding: view }))
+                      }
+                      backupReminderDays={appPrefs.backupReminderDays ?? 0}
+                      onBackupReminderChange={(days) =>
+                        setAppPrefs((prev) => ({ ...prev, backupReminderDays: days }))
+                      }
+                      canInstallApp={installPrompt !== null}
+                      onInstallApp={handleInstallApp}
+                      lastBackupAt={appPrefs.lastBackupAt}
+                      onExportBackup={handleExportAllBackup}
+                      onImportBackup={handleImportBackup}
+                      uiLanguage={appPrefs.uiLanguage ?? 'en'}
+                      onUiLanguageChange={(lang) =>
+                        setAppPrefs((prev) => ({ ...prev, uiLanguage: lang }))
+                      }
+                    />
+                  )}
                     </div>
                   </div>
                 </div>
@@ -2429,59 +2580,6 @@ export default function App() {
           setQuizSetupMode(undefined);
         }}
         onStartSession={handleStartSession}
-      />
-
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        theme={theme}
-        onThemeChange={setTheme}
-        soundEffectsEnabled={!sfxMuted}
-        onSoundEffectsChange={(enabled) => setSfxMuted(!enabled)}
-        speechEnabled={!ttsMuted}
-        onSpeechChange={(enabled) => {
-          setTtsMuted(!enabled);
-          if (!enabled) stopSpeaking();
-        }}
-        showToasts={appPrefs.showToasts}
-        onShowToastsChange={(enabled) =>
-          setAppPrefs((prev) => ({ ...prev, showToasts: enabled }))
-        }
-        autoAdvance={appPrefs.autoAdvance}
-        onAutoAdvanceChange={(enabled) =>
-          setAppPrefs((prev) => ({ ...prev, autoAdvance: enabled }))
-        }
-        defaultTimerSeconds={appPrefs.defaultTimerSeconds}
-        onDefaultTimerChange={(seconds) =>
-          setAppPrefs((prev) => ({ ...prev, defaultTimerSeconds: seconds }))
-        }
-        onResetDefaults={handleResetSettings}
-        onResetStatistics={handleResetStatistics}
-        autoSpeakPrompt={appPrefs.autoSpeakPrompt}
-        onAutoSpeakPromptChange={(enabled) =>
-          setAppPrefs((prev) => ({ ...prev, autoSpeakPrompt: enabled }))
-        }
-        autoSpeakAnswer={appPrefs.autoSpeakAnswer}
-        onAutoSpeakAnswerChange={(enabled) =>
-          setAppPrefs((prev) => ({ ...prev, autoSpeakAnswer: enabled }))
-        }
-        reminderEnabled={appPrefs.reminderEnabled}
-        onReminderChange={handleReminderEnabledChange}
-        notesAutoSave={appPrefs.notesAutoSave ?? true}
-        onNotesAutoSaveChange={(enabled) =>
-          setAppPrefs((prev) => ({ ...prev, notesAutoSave: enabled }))
-        }
-        notesAutoSaveSeconds={appPrefs.notesAutoSaveSeconds ?? 2}
-        onNotesAutoSaveSecondsChange={(seconds) =>
-          setAppPrefs((prev) => ({ ...prev, notesAutoSaveSeconds: seconds }))
-        }
-        canInstallApp={installPrompt !== null}
-        onInstallApp={handleInstallApp}
-        lastBackupAt={appPrefs.lastBackupAt}
-        uiLanguage={appPrefs.uiLanguage ?? 'en'}
-        onUiLanguageChange={(lang) =>
-          setAppPrefs((prev) => ({ ...prev, uiLanguage: lang }))
-        }
       />
 
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

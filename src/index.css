@@ -237,33 +237,61 @@
   animation: step-glow 0.9s ease-out both;
 }
 
+/* Reduced-motion rules shared by the OS preference and the in-app override.
+   html.motion-full opts out of the OS preference; html.reduce-motion forces
+   it on regardless of the OS setting (Settings → Motion). */
 @media (prefers-reduced-motion: reduce) {
-  /* Global catch-all: collapse every CSS animation/transition so the UI is
-     fully usable without motion. JS-driven (motion/react) animations are
-     unaffected and remain instantaneous-feeling via their own durations. */
-  *,
-  *::before,
-  *::after {
+  html:not(.motion-full) *,
+  html:not(.motion-full) *::before,
+  html:not(.motion-full) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 
-  .flashcard-inner {
+  html:not(.motion-full) .flashcard-inner {
     transition-duration: 0.01ms !important;
   }
-  .animate-correct-pulse,
-  .animate-incorrect-shake,
-  .animate-cooldown-critical,
-  .animate-float-up-fade,
-  .celebration-piece,
-  .animate-check-pop,
-  .animate-step-glow,
-  .onboarding-strike {
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.reduce-motion .flashcard-inner {
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(.motion-full) .animate-correct-pulse,
+  html:not(.motion-full) .animate-incorrect-shake,
+  html:not(.motion-full) .animate-cooldown-critical,
+  html:not(.motion-full) .animate-float-up-fade,
+  html:not(.motion-full) .celebration-piece,
+  html:not(.motion-full) .animate-check-pop,
+  html:not(.motion-full) .animate-step-glow,
+  html:not(.motion-full) .onboarding-strike {
     animation: none !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+html.reduce-motion .animate-correct-pulse,
+html.reduce-motion .animate-incorrect-shake,
+html.reduce-motion .animate-cooldown-critical,
+html.reduce-motion .animate-float-up-fade,
+html.reduce-motion .celebration-piece,
+html.reduce-motion .animate-check-pop,
+html.reduce-motion .animate-step-glow,
+html.reduce-motion .onboarding-strike {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* Range slider — themed track + thumb for light & dark modes.

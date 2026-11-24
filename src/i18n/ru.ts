@@ -820,6 +820,41 @@ export const RU: Record<string, string> = {
   'No matches for “{query}”.': 'По запросу «{query}» ничего не найдено.',
   'Accuracy — last {count} {sessions}': 'Точность — последние {count} {sessions}',
   '{pct}% avg': '{pct}% в среднем',
+  'Motion': 'Анимация',
+  'Reduce': 'Уменьшенная',
+  'Full': 'Полная',
+  'Reduce disables non-essential animations. System follows your OS setting.':
+    '«Уменьшенная» отключает несущественные анимации. «Системная» следует настройке ОС.',
+  'Startup': 'Запуск',
+  'Open app to': 'Открывать приложение на',
+  'Which screen is shown when you launch the app.':
+    'Какой экран показывается при запуске приложения.',
+  'Backup reminders': 'Напоминания о резервных копиях',
+  'Every {days} days': 'Каждые {days} дн.',
+  'Show a reminder in the app when it has been this long since your last backup export.':
+    'Показывать напоминание в приложении, если с последней резервной копии прошло больше этого срока.',
+  'Data & Backup': 'Данные и резервные копии',
+  'Export all data': 'Экспорт всех данных',
+  'Never backed up': 'Резервных копий ещё не было',
+  'Backed up today': 'Копия создана сегодня',
+  'Last backup yesterday': 'Последняя копия — вчера',
+  'Last backup {days} days ago': 'Последняя копия — {days} дн. назад',
+  'Export': 'Экспорт',
+  'Import backup': 'Импорт резервной копии',
+  'Restore languages, decks, words, notes, stats, and settings from a JSON backup file.':
+    'Восстановить языки, колоды, слова, заметки, статистику и настройки из JSON-файла резервной копии.',
+  'Import': 'Импорт',
+  'Reset all preferences': 'Сбросить все настройки',
+  'Restore every setting on this page to its default value. Your study data is not affected.':
+    'Вернуть все настройки на этой странице к значениям по умолчанию. Ваши учебные данные не затрагиваются.',
+  'Your last backup was {days} days ago — your data lives only in this browser.':
+    'Последняя резервная копия была {days} дн. назад — ваши данные хранятся только в этом браузере.',
+  'You have no backup yet — your data lives only in this browser.':
+    'Резервных копий пока нет — ваши данные хранятся только в этом браузере.',
+  'Dismiss backup reminder': 'Скрыть напоминание о резервной копии',
+  'Preferences, backup & data': 'Настройки, резервные копии и данные',
+  'Your last backup was {days} days ago — consider exporting one before resetting.':
+    'Последняя резервная копия была {days} дн. назад — рекомендуем сделать новую перед сбросом.',
 };
 
 // Russian one/few/many plural forms keyed by the English singular noun.
