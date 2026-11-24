@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   CloudOff,
@@ -227,7 +227,7 @@ interface NotesPanelProps {
   onConsumeFocusNote?: () => void;
 }
 
-export function NotesPanel({
+function NotesPanelInner({
   notes,
   autoSave,
   intervalSeconds,
@@ -427,3 +427,5 @@ export function NotesPanel({
     </div>
   );
 }
+
+export const NotesPanel = memo(NotesPanelInner);

@@ -310,7 +310,7 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
   );
 });
 
-export function ActivitySection({
+function ActivitySectionInner({
   activity,
   dailyGoal,
   onDailyGoalChange,
@@ -842,3 +842,5 @@ export function ActivitySection({
     </div>
   );
 }
+
+export const ActivitySection = memo(ActivitySectionInner);

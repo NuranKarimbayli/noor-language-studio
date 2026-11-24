@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { CalendarClock, Flame, RefreshCw, Shuffle, Zap } from 'lucide-react';
 import { Deck, StudyStats, VocabCard } from '../types';
 import { getLocalDateString } from '../utils/storage';
@@ -40,7 +40,7 @@ function hashString(input: string): number {
   return hash >>> 0;
 }
 
-export function OverviewStrip({
+function OverviewStripInner({
   languageId,
   decks,
   cards,
@@ -308,3 +308,5 @@ export function OverviewStrip({
     </section>
   );
 }
+
+export const OverviewStrip = memo(OverviewStripInner);

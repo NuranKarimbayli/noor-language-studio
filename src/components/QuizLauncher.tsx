@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   Bug,
   CalendarClock,
@@ -40,7 +41,7 @@ const MODE_CARDS: Array<{
   { mode: 'speaking', label: t('Speaking'), description: t('Say the word out loud'), icon: Mic },
 ];
 
-export function QuizLauncher({
+function QuizLauncherInner({
   hasCards,
   dueCount,
   leechCount,
@@ -181,3 +182,5 @@ export function QuizLauncher({
     </div>
   );
 }
+
+export const QuizLauncher = memo(QuizLauncherInner);

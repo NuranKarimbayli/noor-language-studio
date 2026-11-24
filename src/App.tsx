@@ -327,39 +327,6 @@ export default function App() {
     };
   }, []);
 
-  // Optional browser reminders: at most one Notification per day, only when
-  // cards are actually due and permission was granted in Settings.
-  useEffect(() => {
-    if (
-      !appPrefs.reminderEnabled ||
-      typeof Notification === 'undefined' ||
-      Notification.permission !== 'granted'
-    ) {
-      return;
-    }
-    const maybeNotify = () => {
-      const due = getReviewForecast(cards).today;
-      if (due <= 0) return;
-      const today = getLocalDateString();
-      if (localStorage.getItem('noor_last_review_reminder') === today) return;
-      localStorage.setItem('noor_last_review_reminder', today);
-      try {
-        const notification = new Notification(t('Noor Language Studio'), {
-          body: t('{count} {cards} due for review today.', {
-            count: due,
-            cards: pluralize(due, 'card'),
-          }),
-        });
-        notification.onclick = () => window.focus();
-      } catch {
-        // Notification constructor can throw in restricted contexts
-      }
-    };
-    maybeNotify();
-    const intervalId = window.setInterval(maybeNotify, 30 * 60 * 1000);
-    return () => window.clearInterval(intervalId);
-  }, [appPrefs.reminderEnabled, cards]);
-
   const activeLanguage = useMemo(
     () =>
       languages.find((l) => l.id === activeLanguageId) ??
@@ -394,6 +361,40 @@ export default function App() {
     !activeSession &&
     dueTodayCount > 0 &&
     dueBannerDismissedFor !== getLocalDateString();
+
+  // Optional browser reminders: at most one Notification per day, only when
+  // cards are actually due and permission was granted in Settings. Depends on
+  // the memoized due count rather than `cards`, so the interval isn't reset
+  // on every unrelated card mutation.
+  useEffect(() => {
+    if (
+      !appPrefs.reminderEnabled ||
+      typeof Notification === 'undefined' ||
+      Notification.permission !== 'granted'
+    ) {
+      return;
+    }
+    const maybeNotify = () => {
+      if (dueTodayCount <= 0) return;
+      const today = getLocalDateString();
+      if (localStorage.getItem('noor_last_review_reminder') === today) return;
+      localStorage.setItem('noor_last_review_reminder', today);
+      try {
+        const notification = new Notification(t('Noor Language Studio'), {
+          body: t('{count} {cards} due for review today.', {
+            count: dueTodayCount,
+            cards: pluralize(dueTodayCount, 'card'),
+          }),
+        });
+        notification.onclick = () => window.focus();
+      } catch {
+        // Notification constructor can throw in restricted contexts
+      }
+    };
+    maybeNotify();
+    const intervalId = window.setInterval(maybeNotify, 30 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [appPrefs.reminderEnabled, dueTodayCount]);
 
   // TTS voice binding for the active language
   const activeVoice = useMemo(
@@ -982,6 +983,13 @@ export default function App() {
     setQuizSetupMode(mode);
     setQuizSetupOpen(true);
   }, []);
+
+  const handleOpenQuizSetup = useCallback(
+    (mode: SessionMode) => openQuizSetup(undefined, mode),
+    [openQuizSetup]
+  );
+
+  const handleConsumeFocusNote = useCallback(() => setNotesFocusId(null), []);
 
   const handleStartSession = useCallback((config: SessionConfig) => {
     beginSession(config);
@@ -2277,7 +2285,7 @@ export default function App() {
                       onBulkDeleteCards={handleBulkDeleteCards}
                       onBulkUpdateCards={handleBulkUpdateCards}
                       onImportDeckJson={handleImportDeckJson}
-                      onPracticeDeck={(deckId) => openQuizSetup(deckId)}
+                      onPracticeDeck={openQuizSetup}
                       smartDecks={languageSmartDecks}
                       onCreateSmartDeck={handleCreateSmartDeck}
                       onDeleteSmartDeck={handleDeleteSmartDeck}
@@ -2304,7 +2312,7 @@ export default function App() {
                       onSmartReview={handleStartSmartReview}
                       onDueReview={handleStartDueReview}
                       onLeechLab={handleStartLeechLab}
-                      onOpenSetup={(mode) => openQuizSetup(undefined, mode)}
+                      onOpenSetup={handleOpenQuizSetup}
                     />
                   )}
 
@@ -2344,7 +2352,7 @@ export default function App() {
                       onDeleteNote={handleDeleteNote}
                       onPersist={handlePersistNote}
                       focusNoteId={notesFocusId}
-                      onConsumeFocusNote={() => setNotesFocusId(null)}
+                      onConsumeFocusNote={handleConsumeFocusNote}
                     />
                   )}
                     </div>

@@ -149,6 +149,7 @@ export function QuizCenter({
   const [isListening, setIsListening] = useState(false);
   const [speechTranscript, setSpeechTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognitionSession | null>(null);
+  const relaunchTimerRef = useRef<number | null>(null);
   const speechDeadlineRef = useRef(0);
   const speechDoneRef = useRef(false);
   const speechFatalRef = useRef(false);
@@ -805,7 +806,13 @@ export function QuizCenter({
             setIsListening(false);
             return;
           }
-          window.setTimeout(launch, 250);
+          if (relaunchTimerRef.current !== null) {
+            window.clearTimeout(relaunchTimerRef.current);
+          }
+          relaunchTimerRef.current = window.setTimeout(() => {
+            relaunchTimerRef.current = null;
+            launch();
+          }, 250);
         },
         onError: (code) => {
           // Fatal errors can't be retried; transient ones (no-speech,
@@ -849,6 +856,10 @@ export function QuizCenter({
       return () => {
         recognitionRef.current?.abort();
         recognitionRef.current = null;
+        if (relaunchTimerRef.current !== null) {
+          window.clearTimeout(relaunchTimerRef.current);
+          relaunchTimerRef.current = null;
+        }
         speechDoneRef.current = true;
         setIsListening(false);
       };
@@ -1152,6 +1163,10 @@ export function QuizCenter({
       }
       recognitionRef.current?.abort();
       recognitionRef.current = null;
+      if (relaunchTimerRef.current !== null) {
+        window.clearTimeout(relaunchTimerRef.current);
+        relaunchTimerRef.current = null;
+      }
       speechDoneRef.current = true;
       stopSpeaking();
     };

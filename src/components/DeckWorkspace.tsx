@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { ChangeEvent, FormEvent, memo, useDeferredValue, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -149,7 +149,7 @@ const DIFFICULTY_OPTIONS: Array<{ value: DifficultyLevel; label: string }> = [
   { value: 'hard', label: t('Hard') },
 ];
 
-export function DeckWorkspace({
+function DeckWorkspaceInner({
   languageName,
   languageCode,
   decks,
@@ -2487,3 +2487,7 @@ export function DeckWorkspace({
     </div>
   );
 }
+
+// Memoized: this is the heaviest view in the app — skip re-renders when App
+// state changes that don't affect its props (toasts, prefs, session flags).
+export const DeckWorkspace = memo(DeckWorkspaceInner);
