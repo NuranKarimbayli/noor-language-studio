@@ -258,7 +258,9 @@ export function CommandPalette({
         >
           {items.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-[#78716C] dark:text-[#A8A29E]">
-              No matches{query ? ` for “${query}”` : ''}.
+              {query
+                ? t('No matches for “{query}”.', { query })
+                : t('No matches.')}
             </p>
           )}
           {items.map((item, idx) => {
@@ -317,15 +319,15 @@ export function CommandPalette({
         <div className="flex items-center gap-3 px-4 py-2 border-t border-slate-200 dark:border-[#2E2A25] text-[10px] text-[#A8A29E] dark:text-[#57534E]">
           <span className="inline-flex items-center gap-1">
             <kbd className="font-mono px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E]">↑↓</kbd>
-            navigate
+            {t('navigate')}
           </span>
           <span className="inline-flex items-center gap-1">
             <kbd className="font-mono px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E]">↵</kbd>
-            select
+            {t('select')}
           </span>
           <span className="inline-flex items-center gap-1">
             <kbd className="font-mono px-1 py-0.5 rounded bg-[#F3EFE8] dark:bg-[#25221E]">esc</kbd>
-            close
+            {t('close')}
           </span>
         </div>
       </div>

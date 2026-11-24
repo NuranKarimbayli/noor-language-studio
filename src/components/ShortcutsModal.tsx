@@ -54,7 +54,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
               {t('Keyboard Shortcuts')}
             </h2>
             <p className="text-xs text-[#78716C] dark:text-[#A8A29E] mt-0.5">
-              Press <Kbd>?</Kbd> anytime to toggle this panel.
+              {t('Press')} <Kbd>?</Kbd> {t('anytime to toggle this panel.')}
             </p>
           </div>
           <button

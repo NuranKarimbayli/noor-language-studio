@@ -13,7 +13,6 @@ import {
   ThemeMode,
   VocabCard,
 } from '../types';
-import { PRESET_LANGUAGES, SEED_CARDS, SEED_DECKS } from '../data/seedDecks';
 
 interface NoorStudioDB extends DBSchema {
   languages: {
@@ -76,7 +75,6 @@ interface NoorStudioDB extends DBSchema {
 
 const DB_NAME = 'noor-studio-db';
 const DB_VERSION = 8;
-const SEED_COMPLETED_KEY = 'seed-completed';
 
 let dbPromise: Promise<IDBPDatabase<NoorStudioDB>> | null = null;
 
@@ -300,49 +298,11 @@ async function migrateFromLocalStorage(): Promise<void> {
 }
 
 /**
- * Seed only stores that are genuinely empty. A user can intentionally delete
- * every deck or card, and initialization must not recreate them on the next
- * launch.
- */
-async function initializeWithSeedData(): Promise<void> {
-  const db = await getDB();
-
-  // Seeding runs exactly once. Without this marker, a user who intentionally
-  // deletes every deck or card would see the seed data recreated on launch.
-  if (await db.get('meta', SEED_COMPLETED_KEY)) return;
-
-  let hasLanguages = (await db.getAll('languages')).length > 0;
-  if (!hasLanguages) {
-    const tx = db.transaction('languages', 'readwrite');
-    await putInBatches(PRESET_LANGUAGES, (language) => tx.store.put(language));
-    await tx.done;
-    hasLanguages = true;
-  }
-
-  let hasDecks = (await db.getAll('decks')).length > 0;
-  if (!hasDecks && hasLanguages) {
-    const tx = db.transaction('decks', 'readwrite');
-    await putInBatches(SEED_DECKS, (deck) => tx.store.put(deck));
-    await tx.done;
-    hasDecks = true;
-  }
-
-  const hasCards = (await db.getAll('cards')).length > 0;
-  if (!hasCards && hasDecks) {
-    const tx = db.transaction('cards', 'readwrite');
-    await putInBatches(SEED_CARDS, (card) => tx.store.put(card));
-    await tx.done;
-  }
-
-  await db.put('meta', true, SEED_COMPLETED_KEY);
-}
-
-/**
- * Initialize the database (migration + seed data)
+ * Initialize the database (legacy localStorage migration only — fresh
+ * installs start completely empty).
  */
 export async function initializeDatabase(): Promise<void> {
   await migrateFromLocalStorage();
-  await initializeWithSeedData();
 }
 
 // Language operations
@@ -742,15 +702,6 @@ export async function restoreBackupData(data: {
   if (data.stats) tx.objectStore('stats').put(data.stats, 'main');
 
   await tx.done;
-}
-
-/**
- * Mark seeding as completed without writing any seed data. Used after a full
- * backup restore so preset data isn't resurrected on the next launch.
- */
-export async function markSeedCompleted(): Promise<void> {
-  const db = await getDB();
-  await db.put('meta', true, SEED_COMPLETED_KEY);
 }
 
 /**

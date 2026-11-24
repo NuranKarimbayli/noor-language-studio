@@ -813,6 +813,13 @@ export const RU: Record<string, string> = {
   '{count} in progress (Good)': '{count} в процессе (хорошо)',
   'Word · {confidence}': 'Слово · {confidence}',
   'Translation · {confidence}': 'Перевод · {confidence}',
+  'navigate': 'навигация',
+  'select': 'выбрать',
+  'close': 'закрыть',
+  'No matches.': 'Ничего не найдено.',
+  'No matches for “{query}”.': 'По запросу «{query}» ничего не найдено.',
+  'Accuracy — last {count} {sessions}': 'Точность — последние {count} {sessions}',
+  '{pct}% avg': '{pct}% в среднем',
 };
 
 // Russian one/few/many plural forms keyed by the English singular noun.

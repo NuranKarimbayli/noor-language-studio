@@ -6,8 +6,6 @@ import {
   addLanguage,
   clearAllData,
   deleteCard,
-  deleteCardsByDeck,
-  deleteDeck,
   getAllCards,
   getAllDecks,
   getAllLanguages,
@@ -22,7 +20,6 @@ import {
   updateCard,
   updateDeck,
 } from './indexedDB';
-import { PRESET_LANGUAGES, SEED_CARDS, SEED_DECKS } from '../data/seedDecks';
 import { Deck, LanguageItem, VocabCard } from '../types';
 
 const lang: LanguageItem = {
@@ -61,24 +58,19 @@ beforeEach(async () => {
 });
 
 describe('IndexedDB persistence layer', () => {
-  it('seeds preset data only when stores are empty', async () => {
+  it('starts completely empty — no languages, decks, or cards are seeded', async () => {
     await initializeDatabase();
-    expect(await getAllLanguages()).toHaveLength(PRESET_LANGUAGES.length);
-    expect(await getAllDecks()).toHaveLength(SEED_DECKS.length);
-    expect(await getAllCards()).toHaveLength(SEED_CARDS.length);
-  });
-
-  it('does not reseed decks/cards the user intentionally deleted', async () => {
-    await initializeDatabase();
-    const decks = await getAllDecks();
-    for (const d of decks) {
-      await Promise.all([deleteDeck(d.id), deleteCardsByDeck(d.id)]);
-    }
-    await initializeDatabase();
+    expect(await getAllLanguages()).toHaveLength(0);
     expect(await getAllDecks()).toHaveLength(0);
     expect(await getAllCards()).toHaveLength(0);
-    // Languages survive — only genuinely empty stores reseed
-    expect(await getAllLanguages()).toHaveLength(PRESET_LANGUAGES.length);
+  });
+
+  it('stays empty across repeated initialization', async () => {
+    await initializeDatabase();
+    await initializeDatabase();
+    expect(await getAllLanguages()).toHaveLength(0);
+    expect(await getAllDecks()).toHaveLength(0);
+    expect(await getAllCards()).toHaveLength(0);
   });
 
   it('persists theme across reads (survives reload)', async () => {

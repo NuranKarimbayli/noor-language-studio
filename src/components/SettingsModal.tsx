@@ -414,8 +414,8 @@ export function SettingsModal({
       <div className="shrink-0 px-6 pb-6 pt-3 border-t border-slate-200 dark:border-[#2E2A25] flex items-center justify-between gap-3">
         <p className="text-[11px] text-[#78716C] dark:text-[#A8A29E] flex items-center gap-1.5">
           <Keyboard className="w-3 h-3" />
-          Press <kbd className="font-mono px-1 rounded bg-[#F3EFE8] dark:bg-[#25221E]">?</kbd> for
-          shortcuts
+          {t('Press')} <kbd className="font-mono px-1 rounded bg-[#F3EFE8] dark:bg-[#25221E]">?</kbd>{' '}
+          {t('for shortcuts')}
         </p>
         <button
           type="button"

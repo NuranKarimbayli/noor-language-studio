@@ -19,7 +19,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/Toast';
 import { WordOfTheDay } from './components/WordOfTheDay';
-import { PRESET_LANGUAGES, SEED_CARDS, SEED_DECKS } from './data/seedDecks';
+import { PRESET_LANGUAGES } from './data/presetLanguages';
 import {
   ActivityDay,
   AppPrefs,
@@ -104,7 +104,6 @@ import {
   getTheme,
   getTtsMuted,
   initializeDatabase,
-  markSeedCompleted,
   putActivityDay,
   putCards,
   putNote,
@@ -259,11 +258,11 @@ export default function App() {
       } catch (error) {
         console.error(t('Failed to initialize database:'), error);
         // Keep the app usable even if IndexedDB is unavailable (e.g. private mode)
-        setLanguages(PRESET_LANGUAGES);
-        setDecks(SEED_DECKS);
-        setCards(SEED_CARDS);
-        setActiveLanguageId(PRESET_LANGUAGES[0].id);
-        setSelectedDeckId(SEED_DECKS[0]?.id ?? '');
+        setLanguages([]);
+        setDecks([]);
+        setCards([]);
+        setActiveLanguageId('');
+        setSelectedDeckId('');
       } finally {
         setIsLoading(false);
       }
@@ -271,6 +270,14 @@ export default function App() {
 
     init();
   }, []);
+
+  // Fresh installs have zero languages — send the user to the language
+  // picker instead of a workspace scoped to a non-existent language.
+  useEffect(() => {
+    if (!isLoading && languages.length === 0) {
+      setStage('languages');
+    }
+  }, [isLoading, languages.length]);
 
   // Persist data to IndexedDB when state changes
   useEffect(() => {
@@ -1477,9 +1484,6 @@ export default function App() {
           stats: payload.stats,
           activity: payload.activity ?? [],
         });
-        // Prevent preset seed data from resurrecting on next launch
-        await markSeedCompleted();
-
         setLanguages(payload.languages);
         setDecks(validDecks);
         setCards(validCards);

@@ -736,7 +736,10 @@ export function ActivitySection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <div className="text-xs font-medium text-[#78716C] dark:text-[#A8A29E]">
-              Accuracy — last {Math.min(sessions.length, 10)} sessions
+              {t('Accuracy — last {count} {sessions}', {
+                count: Math.min(sessions.length, 10),
+                sessions: pluralize(Math.min(sessions.length, 10), 'session'),
+              })}
             </div>
             <AccuracySparkline sessions={sessions} />
             <div className="flex items-center justify-between text-[11px] text-[#78716C] dark:text-[#A8A29E] tabular-nums">
@@ -749,7 +752,7 @@ export function ActivitySection({
                       (sum, s) => sum + (s.total > 0 ? s.correct / s.total : 0),
                       0
                     ) / recent.length;
-                  return `${Math.round(avg * 100)}% avg`;
+                  return t('{pct}% avg', { pct: Math.round(avg * 100) });
                 })()}
               </span>
               <span>{t('Recent')}</span>
